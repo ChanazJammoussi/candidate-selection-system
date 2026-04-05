@@ -15,6 +15,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { Slider } from "@/components/ui/slider"
 import {
@@ -28,6 +35,16 @@ import {
   CheckCircle,
   Clock,
 } from "lucide-react"
+import {
+  ConcourType,
+  ScoreCritere,
+  CONCOUR_TYPE_CONFIGS,
+  CONCOUR_TYPE_LABELS,
+} from "@/lib/concours-types"
+
+// ----------------------------------------------------------------
+// Types locaux
+// ----------------------------------------------------------------
 
 interface Competition {
   id: string
@@ -46,11 +63,33 @@ interface Competition {
   }
 }
 
+// ----------------------------------------------------------------
+// Helpers
+// ----------------------------------------------------------------
+
+/** Convertit les coefficients (0–1) en pourcentages entiers (0–100) */
+function variablesToWeights(variables: ScoreCritere[]): Record<string, number> {
+  return Object.fromEntries(variables.map((v) => [v.id, Math.round(v.coefficient * 100)]))
+}
+
+const CHAMP_TYPE_LABELS: Record<string, string> = {
+  text:   "Texte",
+  number: "Nombre",
+  select: "Liste",
+  date:   "Date",
+  file:   "Fichier",
+}
+
+// ----------------------------------------------------------------
+// Page
+// ----------------------------------------------------------------
+
 export default function ConcoursPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showCriteriaDialog, setShowCriteriaDialog] = useState(false)
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null)
 
+  // — État du formulaire de création —
   const [newCompetition, setNewCompetition] = useState({
     name: "",
     description: "",
@@ -59,12 +98,43 @@ export default function ConcoursPage() {
     resultsDate: "",
     places: 10,
   })
+  const [selectedType, setSelectedType] = useState<ConcourType | "">("")
+  const [scoreWeights, setScoreWeights] = useState<Record<string, number>>({})
 
+  // — État du dialog critères existant —
   const [criteria, setCriteria] = useState({
     gpaWeight: 50,
     documentsWeight: 30,
     interviewWeight: 20,
   })
+
+  // ----------------------------------------------------------------
+
+  const handleTypeChange = (value: ConcourType) => {
+    setSelectedType(value)
+    setScoreWeights(variablesToWeights(CONCOUR_TYPE_CONFIGS[value].formuleScore.variables))
+  }
+
+  const handleCreateCompetition = () => {
+    console.log("Creating competition:", { ...newCompetition, type: selectedType, scoreWeights })
+    setShowCreateDialog(false)
+    setNewCompetition({ name: "", description: "", startDate: "", endDate: "", resultsDate: "", places: 10 })
+    setSelectedType("")
+    setScoreWeights({})
+  }
+
+  const openCriteriaDialog = (competition: Competition) => {
+    setSelectedCompetition(competition)
+    setCriteria(competition.criteria)
+    setShowCriteriaDialog(true)
+  }
+
+  const handleSaveCriteria = () => {
+    console.log("Saving criteria:", criteria)
+    setShowCriteriaDialog(false)
+  }
+
+  // ----------------------------------------------------------------
 
   const competitions: Competition[] = [
     {
@@ -107,47 +177,32 @@ export default function ConcoursPage() {
 
   const getStatusBadge = (status: Competition["status"]) => {
     const config = {
-      draft: { label: "Brouillon", className: "bg-muted text-muted-foreground", icon: Edit },
-      open: { label: "Ouvert", className: "bg-success text-success-foreground", icon: CheckCircle },
-      closed: { label: "Fermé", className: "bg-warning text-warning-foreground", icon: Clock },
-      results_published: { label: "Résultats publiés", className: "bg-primary text-primary-foreground", icon: Eye },
+      draft:             { label: "Brouillon",          className: "bg-muted text-muted-foreground",         icon: Edit },
+      open:              { label: "Ouvert",              className: "bg-success text-success-foreground",     icon: CheckCircle },
+      closed:            { label: "Fermé",               className: "bg-warning text-warning-foreground",     icon: Clock },
+      results_published: { label: "Résultats publiés",   className: "bg-primary text-primary-foreground",     icon: Eye },
     }
     return config[status]
   }
 
-  const handleCreateCompetition = () => {
-    // In production, this would call an API
-    console.log("Creating competition:", newCompetition)
-    setShowCreateDialog(false)
-    setNewCompetition({
-      name: "",
-      description: "",
-      startDate: "",
-      endDate: "",
-      resultsDate: "",
-      places: 10,
-    })
-  }
+  // Somme des poids pour la validation
+  const weightsTotal = Object.values(scoreWeights).reduce((s, v) => s + v, 0)
+  const typeConfig = selectedType ? CONCOUR_TYPE_CONFIGS[selectedType] : null
 
-  const openCriteriaDialog = (competition: Competition) => {
-    setSelectedCompetition(competition)
-    setCriteria(competition.criteria)
-    setShowCriteriaDialog(true)
-  }
-
-  const handleSaveCriteria = () => {
-    // In production, this would call an API
-    console.log("Saving criteria:", criteria)
-    setShowCriteriaDialog(false)
-  }
+  // ----------------------------------------------------------------
+  // Render
+  // ----------------------------------------------------------------
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Gestion des concours</h2>
           <p className="text-muted-foreground">Créez et gérez les concours d'intégration</p>
         </div>
+
+        {/* ── Dialog création ── */}
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
             <Button>
@@ -155,14 +210,14 @@ export default function ConcoursPage() {
               Nouveau concours
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Créer un concours</DialogTitle>
-              <DialogDescription>
-                Définissez les paramètres du nouveau concours
-              </DialogDescription>
+              <DialogDescription>Définissez les paramètres du nouveau concours</DialogDescription>
             </DialogHeader>
+
             <FieldGroup>
+              {/* Informations de base */}
               <Field>
                 <FieldLabel htmlFor="name">Nom du concours</FieldLabel>
                 <Input
@@ -172,6 +227,7 @@ export default function ConcoursPage() {
                   placeholder="Concours d'Intégration 2027"
                 />
               </Field>
+
               <Field>
                 <FieldLabel htmlFor="description">Description</FieldLabel>
                 <Textarea
@@ -182,6 +238,91 @@ export default function ConcoursPage() {
                   rows={3}
                 />
               </Field>
+
+              {/* Type de concours */}
+              <Field>
+                <FieldLabel htmlFor="type">Type de concours</FieldLabel>
+                <Select value={selectedType} onValueChange={(v) => handleTypeChange(v as ConcourType)}>
+                  <SelectTrigger id="type">
+                    <SelectValue placeholder="Sélectionner un type…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(CONCOUR_TYPE_LABELS) as ConcourType[]).map((key) => (
+                      <SelectItem key={key} value={key}>
+                        {CONCOUR_TYPE_LABELS[key]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              {/* Aperçu des champs de candidature */}
+              {typeConfig && (
+                <div className="space-y-2">
+                  <FieldLabel>Champs de candidature</FieldLabel>
+                  <div className="rounded-md border bg-muted/40 p-3 space-y-1">
+                    {typeConfig.champs.map((champ) => (
+                      <div
+                        key={champ.id}
+                        className="flex items-center justify-between text-sm py-1 border-b last:border-0 border-border/50"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{champ.label}</span>
+                          {champ.required && (
+                            <span className="text-destructive text-xs">*</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {champ.unit && (
+                            <span className="text-muted-foreground text-xs">{champ.unit}</span>
+                          )}
+                          <Badge variant="outline" className="text-xs">
+                            {CHAMP_TYPE_LABELS[champ.type] ?? champ.type}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                    <p className="text-xs text-muted-foreground pt-1">
+                      * champ obligatoire — aperçu en lecture seule
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Sliders de poids de la formule */}
+              {typeConfig && Object.keys(scoreWeights).length > 0 && (
+                <div className="space-y-3">
+                  <FieldLabel>Formule de score</FieldLabel>
+                  <p className="text-xs text-muted-foreground -mt-1">{typeConfig.formuleScore.description}</p>
+                  <div className="space-y-4">
+                    {typeConfig.formuleScore.variables.map((variable) => (
+                      <div key={variable.id} className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>{variable.label}</span>
+                          <span className="font-medium tabular-nums">{scoreWeights[variable.id] ?? 0}%</span>
+                        </div>
+                        <Slider
+                          value={[scoreWeights[variable.id] ?? 0]}
+                          onValueChange={([val]) =>
+                            setScoreWeights((prev) => ({ ...prev, [variable.id]: val }))
+                          }
+                          min={0}
+                          max={100}
+                          step={5}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className={`rounded-md p-3 text-sm ${weightsTotal === 100 ? "bg-muted" : "bg-destructive/10"}`}>
+                    <strong>Total : {weightsTotal}%</strong>
+                    {weightsTotal !== 100 && (
+                      <span className="text-destructive ml-2">(doit être égal à 100%)</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Dates & places */}
               <div className="grid grid-cols-2 gap-4">
                 <Field>
                   <FieldLabel htmlFor="startDate">Date de début</FieldLabel>
@@ -202,6 +343,7 @@ export default function ConcoursPage() {
                   />
                 </Field>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <Field>
                   <FieldLabel htmlFor="resultsDate">Publication résultats</FieldLabel>
@@ -223,17 +365,26 @@ export default function ConcoursPage() {
                 </Field>
               </div>
             </FieldGroup>
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
                 Annuler
               </Button>
-              <Button onClick={handleCreateCompetition}>Créer</Button>
+              <Button
+                onClick={handleCreateCompetition}
+                disabled={
+                  !selectedType ||
+                  (Object.keys(scoreWeights).length > 0 && weightsTotal !== 100)
+                }
+              >
+                Créer
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Competition Cards */}
+      {/* ── Cartes concours ── */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {competitions.map((competition) => {
           const status = getStatusBadge(competition.status)
@@ -258,7 +409,7 @@ export default function ConcoursPage() {
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <p className="text-muted-foreground">Période</p>
-                      <p className="font-medium">{competition.startDate} - {competition.endDate}</p>
+                      <p className="font-medium">{competition.startDate} – {competition.endDate}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -308,7 +459,7 @@ export default function ConcoursPage() {
         })}
       </div>
 
-      {/* Criteria Dialog */}
+      {/* ── Dialog critères (concours existants) ── */}
       <Dialog open={showCriteriaDialog} onOpenChange={setShowCriteriaDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>

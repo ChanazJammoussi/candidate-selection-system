@@ -66,17 +66,23 @@ export default function CandidatParametresPage() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
+                  <Label htmlFor="firstName">Prénom</Label>
+                  <Input id="firstName" defaultValue="Ahmed" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Nom</Label>
+                  <Input id="lastName" defaultValue="Ben Ali" />
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
                   <Label htmlFor="email">Adresse email</Label>
                   <Input id="email" type="email" defaultValue="ahmed.benali@email.com" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Numero de telephone</Label>
-                  <Input id="phone" type="tel" defaultValue="+213 555 123 456" />
+                  <Label htmlFor="phone">Téléphone</Label>
+                  <Input id="phone" type="tel" defaultValue="+216 55 123 456" />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="username">Nom d&apos;utilisateur</Label>
-                <Input id="username" defaultValue="ahmed.benali" />
               </div>
               <Button onClick={handleSave} className="gap-2">
                 {saved ? <Check className="h-4 w-4" /> : null}
