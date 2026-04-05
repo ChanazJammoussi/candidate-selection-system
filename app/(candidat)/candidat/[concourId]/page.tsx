@@ -1,5 +1,6 @@
 "use client"
 
+import { use } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -15,9 +16,14 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
-export default function CandidatDashboard() {
-  // Mock data - in production, this would come from an API
-  const candidatureStatus = "en_examen" // pending | en_examen | accepte | rejete
+export default function CandidatConcoursDashboard({
+  params,
+}: {
+  params: Promise<{ concourId: string }>
+}) {
+  const { concourId } = use(params)
+
+  const candidatureStatus = "en_examen"
   const documentsProgress = 75
 
   const statusConfig = {
@@ -55,15 +61,13 @@ export default function CandidatDashboard() {
       title: "Compléter ma candidature",
       description: "Finalisez votre dossier de candidature",
       icon: FileText,
-      href: "/candidat/candidature",
-      variant: "default" as const,
+      href: `/candidat/${concourId}/candidature`,
     },
     {
       title: "Voir le classement",
       description: "Consultez votre position",
       icon: Trophy,
-      href: "/candidat/classement",
-      variant: "secondary" as const,
+      href: `/candidat/${concourId}/classement`,
     },
   ]
 
@@ -90,7 +94,6 @@ export default function CandidatDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Message */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Bienvenue, Jean</h2>
@@ -99,14 +102,13 @@ export default function CandidatDashboard() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/candidat/candidature">
+          <Link href={`/candidat/${concourId}/candidature`}>
             Voir ma candidature
             <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </Button>
       </div>
 
-      {/* Status Card */}
       <Card className="border-l-4 border-l-primary">
         <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6">
           <div className="flex items-start gap-4">
@@ -122,7 +124,7 @@ export default function CandidatDashboard() {
             </div>
           </div>
           <Button variant="outline" asChild>
-            <Link href="/candidat/suivi">
+            <Link href={`/candidat/${concourId}/suivi`}>
               Voir le suivi détaillé
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
@@ -130,13 +132,10 @@ export default function CandidatDashboard() {
         </CardContent>
       </Card>
 
-      {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Documents soumis
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Documents soumis</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -148,9 +147,7 @@ export default function CandidatDashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Votre classement
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Votre classement</CardTitle>
             <Trophy className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -161,9 +158,7 @@ export default function CandidatDashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Score actuel
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Score actuel</CardTitle>
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -174,9 +169,7 @@ export default function CandidatDashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Date limite
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Date limite</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -186,9 +179,7 @@ export default function CandidatDashboard() {
         </Card>
       </div>
 
-      {/* Quick Actions & Activity */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Quick Actions */}
         <Card>
           <CardHeader>
             <CardTitle>Actions rapides</CardTitle>
@@ -217,7 +208,6 @@ export default function CandidatDashboard() {
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
         <Card>
           <CardHeader>
             <CardTitle>Activité récente</CardTitle>
@@ -227,15 +217,11 @@ export default function CandidatDashboard() {
             <div className="space-y-4">
               {recentActivities.map((activity, index) => (
                 <div key={index} className="flex items-start gap-4">
-                  <div
-                    className={`mt-1 h-2 w-2 rounded-full ${
-                      activity.type === "success"
-                        ? "bg-success"
-                        : activity.type === "warning"
-                        ? "bg-warning"
-                        : "bg-primary"
-                    }`}
-                  />
+                  <div className={`mt-1 h-2 w-2 rounded-full ${
+                    activity.type === "success" ? "bg-success"
+                    : activity.type === "warning" ? "bg-warning"
+                    : "bg-primary"
+                  }`} />
                   <div className="flex-1 space-y-1">
                     <p className="font-medium leading-none">{activity.title}</p>
                     <p className="text-sm text-muted-foreground">{activity.description}</p>

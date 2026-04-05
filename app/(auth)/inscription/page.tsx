@@ -2,16 +2,17 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { GraduationCap, Eye, EyeOff, Mail, Lock, User, Phone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { Checkbox } from "@/components/ui/checkbox"
+import { useRouter, useSearchParams } from "next/navigation"
 
 export default function InscriptionPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -19,6 +20,7 @@ export default function InscriptionPage() {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
+    cin: "",
     email: "",
     phone: "",
     password: "",
@@ -39,7 +41,8 @@ export default function InscriptionPage() {
     setIsLoading(true)
     // Simulate registration
     setTimeout(() => {
-      router.push("/candidat")
+      const concoursId = searchParams.get("concoursId")
+      router.push(concoursId ? `/candidat/${concoursId}` : "/candidat")
       setIsLoading(false)
     }, 1000)
   }
@@ -126,6 +129,20 @@ export default function InscriptionPage() {
                     />
                   </Field>
                 </div>
+                <Field>
+                  <FieldLabel htmlFor="cin">CIN</FieldLabel>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="cin"
+                      placeholder="12345678"
+                      className="pl-10"
+                      value={formData.cin}
+                      onChange={(e) => setFormData({ ...formData, cin: e.target.value })}
+                      required
+                    />
+                  </div>
+                </Field>
 
                 <Field>
                   <FieldLabel htmlFor="email">Adresse email</FieldLabel>

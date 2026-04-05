@@ -1,18 +1,8 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Search, Trophy, Medal, Award, TrendingUp } from "lucide-react"
-import { useState } from "react"
+import { Trophy, Medal, Award, TrendingUp } from "lucide-react"
 
 interface Candidate {
   rank: number
@@ -23,8 +13,6 @@ interface Candidate {
 }
 
 export default function ClassementPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-
   const candidates: Candidate[] = [
     { rank: 1, name: "Marie Martin", score: 92.5, status: "admis" },
     { rank: 2, name: "Pierre Durand", score: 91.0, status: "admis" },
@@ -43,10 +31,6 @@ export default function ClassementPage() {
     { rank: 15, name: "Chloé Michel", score: 74.0, status: "en_cours" },
   ]
 
-  const filteredCandidates = candidates.filter((c) =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
   const currentUser = candidates.find((c) => c.isCurrentUser)
   const totalCandidates = 156
   const placesAvailable = 10
@@ -59,19 +43,6 @@ export default function ClassementPage() {
         return <Badge className="bg-warning text-warning-foreground">Liste d'attente</Badge>
       default:
         return <Badge variant="outline">En cours</Badge>
-    }
-  }
-
-  const getRankIcon = (rank: number) => {
-    switch (rank) {
-      case 1:
-        return <Trophy className="h-5 w-5 text-yellow-500" />
-      case 2:
-        return <Medal className="h-5 w-5 text-gray-400" />
-      case 3:
-        return <Award className="h-5 w-5 text-amber-600" />
-      default:
-        return null
     }
   }
 
@@ -157,79 +128,6 @@ export default function ClassementPage() {
           </CardContent>
         </Card>
       )}
-
-      {/* Ranking Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <CardTitle>Tableau de classement</CardTitle>
-              <CardDescription>Classement par score décroissant</CardDescription>
-            </div>
-            <div className="relative w-full md:w-64">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher un candidat..."
-                className="pl-9"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-20">Rang</TableHead>
-                <TableHead>Nom du candidat</TableHead>
-                <TableHead className="text-right">Score</TableHead>
-                <TableHead className="text-right">Statut</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCandidates.map((candidate) => (
-                <TableRow
-                  key={candidate.rank}
-                  className={candidate.isCurrentUser ? "bg-primary/5" : ""}
-                >
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      {getRankIcon(candidate.rank)}
-                      <span>{candidate.rank}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {candidate.name}
-                      {candidate.isCurrentUser && (
-                        <Badge variant="outline" className="text-xs">
-                          Vous
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {candidate.score}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {getStatusBadge(candidate.status)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Info */}
-      <Card>
-        <CardContent className="p-4">
-          <p className="text-sm text-muted-foreground text-center">
-            Le classement est mis à jour quotidiennement. Les résultats finaux seront publiés le 1er Avril 2026.
-          </p>
-        </CardContent>
-      </Card>
     </div>
   )
 }
