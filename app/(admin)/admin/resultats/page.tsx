@@ -21,6 +21,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ConcoursSelector } from "@/components/ui/concours-selector"
+import { MOCK_CONCOURS } from "@/lib/mock-concours"
 import {
   Download,
   Upload,
@@ -34,10 +36,13 @@ import {
 } from "lucide-react"
 
 export default function AdminResultatsPage() {
+  const [selectedConcoursId, setSelectedConcoursId] = useState("")
   const [showPublishDialog, setShowPublishDialog] = useState(false)
   const [showNotifyDialog, setShowNotifyDialog] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [isSendingNotifications, setIsSendingNotifications] = useState(false)
+
+  const concoursSelectionne = MOCK_CONCOURS.find((c) => c.id === selectedConcoursId) ?? null
 
   const resultsStatus = {
     isPublished: false,
@@ -89,17 +94,31 @@ export default function AdminResultatsPage() {
           <h2 className="text-2xl font-bold text-foreground">Gestion des résultats</h2>
           <p className="text-muted-foreground">Publiez et gérez les résultats du concours</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Exporter PDF
-          </Button>
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Exporter Excel
-          </Button>
-        </div>
+        {concoursSelectionne && (
+          <div className="flex gap-2">
+            <Button variant="outline">
+              <Download className="mr-2 h-4 w-4" />
+              Exporter PDF
+            </Button>
+            <Button variant="outline">
+              <Download className="mr-2 h-4 w-4" />
+              Exporter Excel
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Sélecteur de concours */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-muted-foreground">Sélectionner un concours</p>
+        <ConcoursSelector
+          options={MOCK_CONCOURS}
+          value={selectedConcoursId}
+          onChange={setSelectedConcoursId}
+        />
+      </div>
+
+      {concoursSelectionne && <>
 
       {/* Status Card */}
       <Card className={resultsStatus.isPublished ? "border-success" : "border-warning"}>
@@ -282,6 +301,8 @@ export default function AdminResultatsPage() {
           </div>
         </CardContent>
       </Card>
+
+      </>}
 
       {/* Publish Dialog */}
       <Dialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>

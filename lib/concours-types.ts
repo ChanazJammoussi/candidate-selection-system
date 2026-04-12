@@ -51,28 +51,34 @@ const ing_prepa: ConcoursTypeDef = {
   label: "Ingénieur (Prépa)",
   description: "Concours d'intégration en cycle ingénieur pour candidats issus des classes préparatoires.",
   champs: [
-    { id: "nom",              label: "Nom",                       type: "text",   required: true },
-    { id: "prenom",           label: "Prénom",                    type: "text",   required: true },
-    { id: "cin",              label: "N° CIN",                    type: "text",   required: true },
-    { id: "dateNaissance",    label: "Date de naissance",         type: "date",   required: true },
-    { id: "etablissementPrepa", label: "Établissement prépa",     type: "text",   required: true },
-    { id: "filiere",          label: "Filière prépa",             type: "select", required: true,
+    // — Identité —
+    { id: "nom",            label: "Nom",                 type: "text",   required: true },
+    { id: "prenom",         label: "Prénom",              type: "text",   required: true },
+    { id: "cin",            label: "N° CIN",              type: "text",   required: true },
+    { id: "dateNaissance",  label: "Date de naissance",   type: "date",   required: true },
+    // — Baccalauréat —
+    { id: "bac_section",    label: "Section bac",         type: "select", required: true,
+      options: ["Sciences", "Maths", "Technique", "Économie", "Lettres", "Informatique", "Sport"] },
+    { id: "bac_session",    label: "Session bac",         type: "select", required: true,
+      options: ["Principale", "Contrôle"] },
+    { id: "moyenne_bac",    label: "Moyenne bac",         type: "number", required: true, unit: "/20" },
+    // — Prépa —
+    { id: "filiere_prepa",  label: "Filière prépa",       type: "select", required: true,
       options: ["MP", "PC", "PT", "TSI", "BCPST", "Autre"] },
-    { id: "notesMaths",       label: "Note Maths (/20)",          type: "number", required: true, unit: "/20" },
-    { id: "notesPhysique",    label: "Note Physique (/20)",       type: "number", required: true, unit: "/20" },
-    { id: "notesInformatique",label: "Note Informatique (/20)",   type: "number", required: false, unit: "/20" },
-    { id: "notesLangue",      label: "Note Langue (Anglais /20)", type: "number", required: true, unit: "/20" },
-    { id: "rangPrepa",        label: "Rang au classement prépa",  type: "number", required: true },
-    { id: "diplomeBac",       label: "Diplôme Bac (scan)",        type: "file",   required: true },
-    { id: "releveNotes",      label: "Relevé de notes prépa",     type: "file",   required: true },
+    { id: "moyenne_prepa_1", label: "Moyenne prépa — 1ère année", type: "number", required: true,  unit: "/20" },
+    { id: "moyenne_prepa_2", label: "Moyenne prépa — 2ème année", type: "number", required: false, unit: "/20" },
+    // — Documents —
+    { id: "cin_recto",      label: "CIN (recto)",         type: "file",   required: true },
+    { id: "cin_verso",      label: "CIN (verso)",         type: "file",   required: true },
+    { id: "diplome_bac",    label: "Diplôme bac",         type: "file",   required: true },
+    { id: "releve_prepa",   label: "Relevés de notes prépa", type: "file", required: true },
   ],
   formuleScore: {
-    description: "Score = 0.40×Maths + 0.30×Physique + 0.15×Informatique + 0.15×Langue",
+    description: "Score = moyenne_bac × 0.30 + moyenne_prepa_1 × 0.30 + moyenne_prepa_2 × 0.40",
     variables: [
-      { id: "notesMaths",        label: "Maths",        coefficient: 0.40 },
-      { id: "notesPhysique",     label: "Physique",     coefficient: 0.30 },
-      { id: "notesInformatique", label: "Informatique", coefficient: 0.15 },
-      { id: "notesLangue",       label: "Langue",       coefficient: 0.15 },
+      { id: "moyenne_bac",     label: "Moyenne bac",              coefficient: 0.30 },
+      { id: "moyenne_prepa_1", label: "Moyenne prépa 1ère année", coefficient: 0.30 },
+      { id: "moyenne_prepa_2", label: "Moyenne prépa 2ème année", coefficient: 0.40 },
     ],
     calculer(valeurs) {
       return this.variables.reduce(
@@ -91,27 +97,36 @@ const ing_licence: ConcoursTypeDef = {
   label: "Ingénieur (Licence)",
   description: "Concours d'intégration en cycle ingénieur pour titulaires d'une licence fondamentale ou appliquée.",
   champs: [
-    { id: "nom",              label: "Nom",                         type: "text",   required: true },
-    { id: "prenom",           label: "Prénom",                      type: "text",   required: true },
-    { id: "cin",              label: "N° CIN",                      type: "text",   required: true },
-    { id: "dateNaissance",    label: "Date de naissance",           type: "date",   required: true },
-    { id: "etablissementLicence", label: "Établissement (licence)", type: "text",   required: true },
-    { id: "specialite",       label: "Spécialité licence",          type: "text",   required: true },
-    { id: "moyenneLicence",   label: "Moyenne générale licence (/20)", type: "number", required: true, unit: "/20" },
-    { id: "notesMaths",       label: "Note Maths (S1+S2 /20)",      type: "number", required: true, unit: "/20" },
-    { id: "notesAlgo",        label: "Note Algo/Prog (S1+S2 /20)",  type: "number", required: true, unit: "/20" },
-    { id: "notesLangue",      label: "Note Langue (Anglais /20)",   type: "number", required: true, unit: "/20" },
-    { id: "rangLicence",      label: "Rang dans la promotion",      type: "number", required: false },
-    { id: "diplomeLicence",   label: "Diplôme Licence (scan)",      type: "file",   required: true },
-    { id: "releveNotes",      label: "Relevés de notes (L1→L3)",    type: "file",   required: true },
+    // — Identité —
+    { id: "nom",            label: "Nom",                 type: "text",   required: true },
+    { id: "prenom",         label: "Prénom",              type: "text",   required: true },
+    { id: "cin",            label: "N° CIN",              type: "text",   required: true },
+    { id: "dateNaissance",  label: "Date de naissance",   type: "date",   required: true },
+    // — Baccalauréat —
+    { id: "bac_section",    label: "Section bac",         type: "select", required: true,
+      options: ["Sciences", "Maths", "Technique", "Économie", "Lettres", "Informatique", "Sport"] },
+    { id: "bac_session",    label: "Session bac",         type: "select", required: true,
+      options: ["Principale", "Contrôle"] },
+    { id: "moyenne_bac",    label: "Moyenne bac",         type: "number", required: true, unit: "/20" },
+    // — Licence —
+    { id: "specialite",     label: "Spécialité licence",  type: "text",   required: true },
+    { id: "moyenne_licence_1", label: "Moyenne licence — 1ère année", type: "number", required: true,  unit: "/20" },
+    { id: "moyenne_licence_2", label: "Moyenne licence — 2ème année", type: "number", required: true,  unit: "/20" },
+    { id: "moyenne_licence_3", label: "Moyenne licence — 3ème année", type: "number", required: false, unit: "/20" },
+    // — Documents —
+    { id: "cin_recto",         label: "CIN (recto)",             type: "file", required: true },
+    { id: "cin_verso",         label: "CIN (verso)",             type: "file", required: true },
+    { id: "diplome_bac",       label: "Diplôme bac",             type: "file", required: true },
+    { id: "diplome_licence",   label: "Diplôme licence",         type: "file", required: true },
+    { id: "releves_licence",   label: "Relevés de notes (L1→L3)", type: "file", required: true },
   ],
   formuleScore: {
-    description: "Score = 0.35×MoyenneLicence + 0.25×Maths + 0.25×Algo + 0.15×Langue",
+    description: "Score = moyenne_bac × 0.20 + moyenne_licence_1 × 0.20 + moyenne_licence_2 × 0.25 + moyenne_licence_3 × 0.35",
     variables: [
-      { id: "moyenneLicence", label: "Moyenne Licence", coefficient: 0.35 },
-      { id: "notesMaths",     label: "Maths",           coefficient: 0.25 },
-      { id: "notesAlgo",      label: "Algo/Prog",       coefficient: 0.25 },
-      { id: "notesLangue",    label: "Langue",          coefficient: 0.15 },
+      { id: "moyenne_bac",       label: "Moyenne bac",              coefficient: 0.20 },
+      { id: "moyenne_licence_1", label: "Moyenne licence 1ère année", coefficient: 0.20 },
+      { id: "moyenne_licence_2", label: "Moyenne licence 2ème année", coefficient: 0.25 },
+      { id: "moyenne_licence_3", label: "Moyenne licence 3ème année", coefficient: 0.35 },
     ],
     calculer(valeurs) {
       return this.variables.reduce(
@@ -128,38 +143,43 @@ const ing_licence: ConcoursTypeDef = {
 const master: ConcoursTypeDef = {
   id: "master",
   label: "Master",
-  description: "Concours d'admission en master pour candidats titulaires d'une licence ou d'un diplôme équivalent.",
+  description: "Concours d'admission en master pour candidats titulaires d'une licence (Bac+3).",
   champs: [
-    { id: "nom",              label: "Nom",                           type: "text",   required: true },
-    { id: "prenom",           label: "Prénom",                        type: "text",   required: true },
-    { id: "cin",              label: "N° CIN",                        type: "text",   required: true },
-    { id: "dateNaissance",    label: "Date de naissance",             type: "date",   required: true },
-    { id: "niveauEtudes",     label: "Niveau d'études actuel",        type: "select", required: true,
-      options: ["Licence (Bac+3)", "Maîtrise (Bac+4)", "Autre"] },
-    { id: "etablissement",    label: "Établissement d'origine",       type: "text",   required: true },
-    { id: "specialite",       label: "Spécialité",                    type: "text",   required: true },
-    { id: "moyenneGenerale",  label: "Moyenne générale (/20)",        type: "number", required: true, unit: "/20" },
-    { id: "noteMemoire",      label: "Note mémoire / PFE (/20)",      type: "number", required: false, unit: "/20" },
-    { id: "notesLangue",      label: "Note Langue (Anglais /20)",     type: "number", required: true, unit: "/20" },
-    { id: "experiencePro",    label: "Expérience professionnelle (mois)", type: "number", required: false },
-    { id: "diplome",          label: "Diplôme (scan)",                type: "file",   required: true },
-    { id: "releveNotes",      label: "Relevés de notes",              type: "file",   required: true },
-    { id: "cv",               label: "CV",                            type: "file",   required: false },
+    // — Identité —
+    { id: "nom",            label: "Nom",                 type: "text",   required: true },
+    { id: "prenom",         label: "Prénom",              type: "text",   required: true },
+    { id: "cin",            label: "N° CIN",              type: "text",   required: true },
+    { id: "dateNaissance",  label: "Date de naissance",   type: "date",   required: true },
+    // — Baccalauréat —
+    { id: "bac_section",    label: "Section bac",         type: "select", required: true,
+      options: ["Sciences", "Maths", "Technique", "Économie", "Lettres", "Informatique", "Sport"] },
+    { id: "bac_session",    label: "Session bac",         type: "select", required: true,
+      options: ["Principale", "Contrôle"] },
+    { id: "moyenne_bac",    label: "Moyenne bac",         type: "number", required: true, unit: "/20" },
+    // — Licence —
+    { id: "specialite",        label: "Spécialité",              type: "text",   required: true },
+    { id: "moyenne_licence_1", label: "Moyenne — 1ère année",   type: "number", required: true,  unit: "/20" },
+    { id: "moyenne_licence_2", label: "Moyenne — 2ème année",   type: "number", required: true,  unit: "/20" },
+    { id: "moyenne_licence_3", label: "Moyenne — 3ème année",   type: "number", required: true,  unit: "/20" },
+    // — Documents —
+    { id: "cin_recto",       label: "CIN (recto)",          type: "file", required: true },
+    { id: "cin_verso",       label: "CIN (verso)",          type: "file", required: true },
+    { id: "diplome_bac",     label: "Diplôme bac",          type: "file", required: true },
+    { id: "diplome_licence", label: "Diplôme licence",      type: "file", required: true },
+    { id: "releves_notes",   label: "Relevés de notes",     type: "file", required: true },
+    { id: "cv",              label: "CV",                   type: "file", required: false },
   ],
   formuleScore: {
-    description: "Score = 0.45×MoyenneGénérale + 0.25×NoteMémoire + 0.20×Langue + 0.10×ExpériencePro (plafonnée à 20)",
+    description: "Score = moyenne_bac × 0.20 + moyenne_licence_1 × 0.20 + moyenne_licence_2 × 0.25 + moyenne_licence_3 × 0.35",
     variables: [
-      { id: "moyenneGenerale", label: "Moyenne générale", coefficient: 0.45 },
-      { id: "noteMemoire",     label: "Mémoire/PFE",      coefficient: 0.25 },
-      { id: "notesLangue",     label: "Langue",           coefficient: 0.20 },
-      { id: "experiencePro",   label: "Expérience Pro",   coefficient: 0.10 },
+      { id: "moyenne_bac",       label: "Moyenne bac",        coefficient: 0.20 },
+      { id: "moyenne_licence_1", label: "Moyenne 1ère année", coefficient: 0.20 },
+      { id: "moyenne_licence_2", label: "Moyenne 2ème année", coefficient: 0.25 },
+      { id: "moyenne_licence_3", label: "Moyenne 3ème année", coefficient: 0.35 },
     ],
     calculer(valeurs) {
-      // L'expérience est en mois, on la ramène sur 20 (24 mois = 20/20)
-      const expNormalisee = Math.min((valeurs["experiencePro"] ?? 0) / 24 * 20, 20)
-      const valeursAjustees = { ...valeurs, experiencePro: expNormalisee }
       return this.variables.reduce(
-        (sum, v) => sum + (valeursAjustees[v.id] ?? 0) * v.coefficient,
+        (sum, v) => sum + (valeurs[v.id] ?? 0) * v.coefficient,
         0
       )
     },

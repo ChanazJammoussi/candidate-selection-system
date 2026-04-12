@@ -71,16 +71,7 @@ export function Sidebar({ role, concourId }: SidebarProps) {
 
   const adminNavItems: NavItem[] = [
     { href: "/admin", label: "Accueil", icon: <LayoutDashboard className="h-5 w-5" /> },
-    {
-      href: "/admin/candidats",
-      label: "Candidats",
-      icon: <Users className="h-5 w-5" />,
-      badge: 12,
-      children: [
-        { href: "/admin/candidats", label: "Liste candidats" },
-        { href: "/admin/documents", label: "Documents" },
-      ],
-    },
+    { href: "/admin/candidats", label: "Candidats", icon: <Users className="h-5 w-5" />, badge: 12 },
     {
       href: "/admin/concours",
       label: "Concours",
@@ -88,6 +79,7 @@ export function Sidebar({ role, concourId }: SidebarProps) {
       badge: 3,
       children: [
         { href: "/admin/concours", label: "Gestion concours" },
+        { href: "/admin/candidatures", label: "Candidatures" },
         { href: "/admin/classement", label: "Classement" },
         { href: "/admin/resultats", label: "Resultats" },
       ],

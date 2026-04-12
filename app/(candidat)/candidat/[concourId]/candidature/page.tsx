@@ -223,6 +223,8 @@ export default function CandidaturePage() {
     n === "1ere" ? "1ère année" : n === "2eme" ? "2ème année" : ""
 
   const requiredDocs: RequiredDoc[] = [
+    { id: "cin-recto",    label: "CIN (recto)" },
+    { id: "cin-verso",    label: "CIN (verso)" },
     { id: "diplome-bac",  label: "Diplôme du baccalauréat" },
     { id: "releve-bac",   label: "Relevé de notes du baccalauréat" },
     ...(concours?.type === "ing_licence" || concours?.type === "master"

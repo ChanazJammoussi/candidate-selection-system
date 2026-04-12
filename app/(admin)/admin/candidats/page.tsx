@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,14 +23,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -49,8 +42,10 @@ import {
 
 interface Candidate {
   id: string
+  cin: string
   name: string
   email: string
+  concours: string
   diploma: string
   specialization: string
   gpa: number
@@ -61,16 +56,17 @@ interface Candidate {
 }
 
 export default function CandidatsPage() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null)
-  const [showDetailDialog, setShowDetailDialog] = useState(false)
 
   const candidates: Candidate[] = [
     {
       id: "1",
+      cin: "12345678",
       name: "Marie Martin",
       email: "marie.m@email.com",
+      concours: "Concours Ingénierie 2026",
       diploma: "Master",
       specialization: "Informatique",
       gpa: 16.5,
@@ -81,8 +77,10 @@ export default function CandidatsPage() {
     },
     {
       id: "2",
+      cin: "23456789",
       name: "Pierre Durand",
       email: "pierre.d@email.com",
+      concours: "Concours Mathématiques 2026",
       diploma: "Licence",
       specialization: "Mathématiques",
       gpa: 15.8,
@@ -93,8 +91,10 @@ export default function CandidatsPage() {
     },
     {
       id: "3",
+      cin: "34567890",
       name: "Sophie Bernard",
       email: "sophie.b@email.com",
+      concours: "Concours Ingénierie 2026",
       diploma: "Master",
       specialization: "Physique",
       gpa: 15.2,
@@ -105,8 +105,10 @@ export default function CandidatsPage() {
     },
     {
       id: "4",
+      cin: "45678901",
       name: "Lucas Petit",
       email: "lucas.p@email.com",
+      concours: "Concours Ingénierie 2026",
       diploma: "Licence",
       specialization: "Informatique",
       gpa: 14.8,
@@ -117,8 +119,10 @@ export default function CandidatsPage() {
     },
     {
       id: "5",
+      cin: "56789012",
       name: "Emma Leroy",
       email: "emma.l@email.com",
+      concours: "Concours Électronique 2026",
       diploma: "Master",
       specialization: "Électronique",
       gpa: 14.5,
@@ -129,8 +133,10 @@ export default function CandidatsPage() {
     },
     {
       id: "6",
+      cin: "67890123",
       name: "Jean Dupont",
       email: "jean.d@email.com",
+      concours: "Concours Ingénierie 2026",
       diploma: "Licence",
       specialization: "Informatique",
       gpa: 15.5,
@@ -141,8 +147,10 @@ export default function CandidatsPage() {
     },
     {
       id: "7",
+      cin: "78901234",
       name: "Camille Roux",
       email: "camille.r@email.com",
+      concours: "Concours IA 2026",
       diploma: "Master",
       specialization: "IA",
       gpa: 13.8,
@@ -156,7 +164,8 @@ export default function CandidatsPage() {
   const filteredCandidates = candidates.filter((c) => {
     const matchesSearch =
       c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.email.toLowerCase().includes(searchQuery.toLowerCase())
+      c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.cin.includes(searchQuery)
     const matchesStatus = statusFilter === "all" || c.status === statusFilter
     return matchesSearch && matchesStatus
   })
@@ -182,13 +191,7 @@ export default function CandidatsPage() {
   }
 
   const handleStatusChange = (candidateId: string, newStatus: Candidate["status"]) => {
-    // In production, this would call an API
     console.log(`Changing status of ${candidateId} to ${newStatus}`)
-  }
-
-  const viewCandidateDetails = (candidate: Candidate) => {
-    setSelectedCandidate(candidate)
-    setShowDetailDialog(true)
   }
 
   return (
@@ -217,7 +220,7 @@ export default function CandidatsPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Rechercher par nom ou email..."
+                placeholder="Rechercher par nom, email ou CIN..."
                 className="pl-9"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -253,11 +256,11 @@ export default function CandidatsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>CIN</TableHead>
                 <TableHead>Candidat</TableHead>
+                <TableHead>Concours</TableHead>
                 <TableHead>Formation</TableHead>
-                <TableHead className="text-center">Moyenne</TableHead>
                 <TableHead className="text-center">Score</TableHead>
-                <TableHead className="text-center">Documents</TableHead>
                 <TableHead className="text-center">Statut</TableHead>
                 <TableHead className="text-center">Actions</TableHead>
               </TableRow>
@@ -265,15 +268,16 @@ export default function CandidatsPage() {
             <TableBody>
               {filteredCandidates.map((candidate) => {
                 const status = getStatusBadge(candidate.status)
-                const docs = getDocsBadge(candidate.documentsStatus)
                 return (
                   <TableRow key={candidate.id}>
+                    <TableCell className="font-mono text-sm">{candidate.cin}</TableCell>
                     <TableCell>
                       <div>
                         <p className="font-medium">{candidate.name}</p>
                         <p className="text-sm text-muted-foreground">{candidate.email}</p>
                       </div>
                     </TableCell>
+                    <TableCell className="text-sm">{candidate.concours}</TableCell>
                     <TableCell>
                       <div>
                         <p className="font-medium">{candidate.diploma}</p>
@@ -281,15 +285,7 @@ export default function CandidatsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-center font-medium">
-                      {candidate.gpa}/20
-                    </TableCell>
-                    <TableCell className="text-center font-medium">
                       {candidate.score}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="outline" className={docs.className}>
-                        {docs.label}
-                      </Badge>
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="outline" className={status.className}>
@@ -306,7 +302,7 @@ export default function CandidatsPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => viewCandidateDetails(candidate)}>
+                          <DropdownMenuItem onClick={() => router.push(`/admin/candidats/${candidate.id}`)}>
                             <Eye className="mr-2 h-4 w-4" />
                             Voir détails
                           </DropdownMenuItem>
@@ -334,88 +330,6 @@ export default function CandidatsPage() {
         </CardContent>
       </Card>
 
-      {/* Candidate Detail Dialog */}
-      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Détails du candidat</DialogTitle>
-            <DialogDescription>
-              Informations complètes sur la candidature
-            </DialogDescription>
-          </DialogHeader>
-          {selectedCandidate && (
-            <div className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-3">
-                  <h4 className="font-semibold">Informations personnelles</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Nom</span>
-                      <span>{selectedCandidate.name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Email</span>
-                      <span>{selectedCandidate.email}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Date de soumission</span>
-                      <span>{selectedCandidate.submittedAt}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <h4 className="font-semibold">Informations académiques</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Diplôme</span>
-                      <span>{selectedCandidate.diploma}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Spécialisation</span>
-                      <span>{selectedCandidate.specialization}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Moyenne</span>
-                      <span>{selectedCandidate.gpa}/20</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Score calculé</span>
-                      <span className="font-semibold">{selectedCandidate.score}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between py-3 border-t border-b border-border">
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-muted-foreground">Statut actuel:</span>
-                  <Badge variant="outline" className={getStatusBadge(selectedCandidate.status).className}>
-                    {getStatusBadge(selectedCandidate.status).label}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-muted-foreground">Documents:</span>
-                  <Badge variant="outline" className={getDocsBadge(selectedCandidate.documentsStatus).className}>
-                    {getDocsBadge(selectedCandidate.documentsStatus).label}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDetailDialog(false)}>
-              Fermer
-            </Button>
-            <Button variant="destructive" onClick={() => handleStatusChange(selectedCandidate?.id || "", "rejete")}>
-              <XCircle className="mr-2 h-4 w-4" />
-              Rejeter
-            </Button>
-            <Button onClick={() => handleStatusChange(selectedCandidate?.id || "", "admis")}>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Accepter
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

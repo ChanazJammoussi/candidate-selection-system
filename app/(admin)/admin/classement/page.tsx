@@ -22,6 +22,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ConcoursSelector } from "@/components/ui/concours-selector"
+import { MOCK_CONCOURS } from "@/lib/mock-concours"
 import {
   Search,
   RefreshCw,
@@ -34,6 +36,13 @@ import {
   Calculator,
   ArrowUpDown,
 } from "lucide-react"
+
+// formules par concours (données locales à la page)
+const FORMULES: Record<string, string> = {
+  "1": "notesMaths * 0.40 + notesPhysique * 0.30 + notesInformatique * 0.15 + notesLangue * 0.15",
+  "2": "notesMaths * 0.40 + notesPhysique * 0.30 + notesInformatique * 0.15 + notesLangue * 0.15",
+  "3": "moyenneGenerale * 0.45 + noteMemoire * 0.25 + notesLangue * 0.20 + experiencePro * 0.10",
+}
 
 interface RankedCandidate {
   rank: number
@@ -48,10 +57,13 @@ interface RankedCandidate {
 }
 
 export default function AdminClassementPage() {
+  const [selectedConcoursId, setSelectedConcoursId] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [lastGenerated, setLastGenerated] = useState("15/03/2026 à 14:30")
+
+  const concoursSelectionne = MOCK_CONCOURS.find((c) => c.id === selectedConcoursId) ?? null
 
   const rankedCandidates: RankedCandidate[] = [
     { rank: 1, id: "1", name: "Marie Martin", email: "marie.m@email.com", gpaScore: 45, documentsScore: 27, totalScore: 92.5, status: "admis", previousRank: 1 },
@@ -77,7 +89,8 @@ export default function AdminClassementPage() {
       c.email.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const placesAvailable = 10
+  const placesAvailable = concoursSelectionne?.places ?? 10
+  const formule = selectedConcoursId ? FORMULES[selectedConcoursId] ?? "" : ""
   const admisCount = rankedCandidates.filter((c) => c.status === "admis").length
   const listeAttenteCount = rankedCandidates.filter((c) => c.status === "liste_attente").length
 
@@ -135,26 +148,40 @@ export default function AdminClassementPage() {
           <h2 className="text-2xl font-bold text-foreground">Classement automatique</h2>
           <p className="text-muted-foreground">Génération et gestion du classement des candidats</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Exporter
-          </Button>
-          <Button onClick={handleGenerateRanking} disabled={isGenerating}>
-            {isGenerating ? (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Génération...
-              </>
-            ) : (
-              <>
-                <Calculator className="mr-2 h-4 w-4" />
-                Générer classement
-              </>
-            )}
-          </Button>
-        </div>
+        {concoursSelectionne && (
+          <div className="flex gap-2">
+            <Button variant="outline">
+              <Download className="mr-2 h-4 w-4" />
+              Exporter
+            </Button>
+            <Button onClick={handleGenerateRanking} disabled={isGenerating}>
+              {isGenerating ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Génération...
+                </>
+              ) : (
+                <>
+                  <Calculator className="mr-2 h-4 w-4" />
+                  Générer classement
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Sélecteur de concours */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-muted-foreground">Sélectionner un concours</p>
+        <ConcoursSelector
+          options={MOCK_CONCOURS}
+          value={selectedConcoursId}
+          onChange={setSelectedConcoursId}
+        />
+      </div>
+
+      {concoursSelectionne && <>
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -209,11 +236,7 @@ export default function AdminClassementPage() {
         <Calculator className="h-4 w-4" />
         <AlertTitle>Formule de calcul du score</AlertTitle>
         <AlertDescription>
-          Score total = (Moyenne × 50%) + (Documents × 30%) + (Motivation × 20%)
-          <br />
-          <span className="text-xs text-muted-foreground">
-            Les coefficients sont définis dans les paramètres du concours.
-          </span>
+          <span className="font-mono text-sm">score = {formule}</span>
         </AlertDescription>
       </Alert>
 
@@ -286,6 +309,8 @@ export default function AdminClassementPage() {
           </Table>
         </CardContent>
       </Card>
+
+      </>}
 
       {/* Confirm Dialog */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>

@@ -1,61 +1,92 @@
-import { ConcourType, ScoreCritere, CONCOURS_TYPES } from "./concours-types"
+import type { ConcoursOption } from "@/components/ui/concours-selector"
+import type { ConcourType } from "@/lib/concours-types"
 
-export type Concours = {
+// ----------------------------------------------------------------
+// Type côté candidat
+// ----------------------------------------------------------------
+
+export interface Concours {
   id: string
   titre: string
-  institution: string
+  type: ConcourType
   domaine: string
+  institution: string
   dateClotureInscription: string
-  dateEpreuve: string
   placesDisponibles: number
   candidatsInscrits: number
-  description: string
-  type: ConcourType
-  scoreFormula: ScoreCritere[]
 }
+
+// ----------------------------------------------------------------
+// Données candidat — concours ouverts
+// ----------------------------------------------------------------
 
 export const CONCOURS_OUVERTS: Concours[] = [
   {
-    id: "ing-info-prepa-2026",
-    titre: "Cycle Ingénieur Informatique — Prépa",
-    institution: "École Nationale d'Ingénieurs de Tunis",
-    domaine: "Informatique",
-    dateClotureInscription: "30 Mars 2026",
-    dateEpreuve: "15 Avril 2026",
-    placesDisponibles: 50,
-    candidatsInscrits: 187,
-    description: "Concours d'intégration en cycle ingénieur informatique, ouvert aux étudiants issus des classes préparatoires intégrées.",
+    id: "1",
+    titre: "Cycle Ingénieur — Prépa (Bac+2)",
     type: "ing_prepa",
-    scoreFormula: CONCOURS_TYPES["ing_prepa"].formuleScore.variables,
-  },
-  {
-    id: "ing-info-licence-2026",
-    titre: "Cycle Ingénieur Informatique — Licence",
-    institution: "École Nationale d'Ingénieurs de Tunis",
     domaine: "Informatique",
-    dateClotureInscription: "28 Mars 2026",
-    dateEpreuve: "12 Avril 2026",
-    placesDisponibles: 40,
-    candidatsInscrits: 214,
-    description: "Concours d'intégration en cycle ingénieur informatique, ouvert aux titulaires d'une licence en informatique ou domaine connexe.",
-    type: "ing_licence",
-    scoreFormula: CONCOURS_TYPES["ing_licence"].formuleScore.variables,
+    institution: "École Nationale d'Ingénieurs de Tunis",
+    dateClotureInscription: "31/03/2026",
+    placesDisponibles: 10,
+    candidatsInscrits: 156,
   },
   {
-    id: "master-electronique-2026",
-    titre: "Master Électronique & Systèmes Embarqués",
-    institution: "École Supérieure des Sciences et Technologies de Tunis",
-    domaine: "Électronique",
-    dateClotureInscription: "5 Avril 2026",
-    dateEpreuve: "22 Avril 2026",
-    placesDisponibles: 30,
-    candidatsInscrits: 96,
-    description: "Concours d'admission en master électronique et systèmes embarqués, ouvert aux titulaires d'une licence en électronique, électrotechnique ou informatique industrielle.",
+    id: "2",
+    titre: "Cycle Ingénieur — Licence (Bac+3)",
+    type: "ing_licence",
+    domaine: "Informatique",
+    institution: "École Nationale d'Ingénieurs de Tunis",
+    dateClotureInscription: "31/03/2026",
+    placesDisponibles: 10,
+    candidatsInscrits: 98,
+  },
+  {
+    id: "3",
+    titre: "Concours Master (Bac+3 / Bac+4)",
     type: "master",
-    scoreFormula: CONCOURS_TYPES["master"].formuleScore.variables,
+    domaine: "Informatique",
+    institution: "École Nationale d'Ingénieurs de Tunis",
+    dateClotureInscription: "15/05/2026",
+    placesDisponibles: 5,
+    candidatsInscrits: 0,
   },
 ]
 
 export function getConcoursById(id: string): Concours | undefined {
   return CONCOURS_OUVERTS.find((c) => c.id === id)
 }
+
+// ----------------------------------------------------------------
+// Données admin — sélecteur de concours
+// ----------------------------------------------------------------
+
+export const MOCK_CONCOURS: ConcoursOption[] = [
+  {
+    id: "1",
+    name: "Concours d'Intégration 2026",
+    status: "open",
+    startDate: "01/03/2026",
+    endDate: "31/03/2026",
+    places: 10,
+    registeredCount: 156,
+  },
+  {
+    id: "2",
+    name: "Concours d'Intégration 2025",
+    status: "results_published",
+    startDate: "01/03/2025",
+    endDate: "31/03/2025",
+    places: 10,
+    registeredCount: 142,
+  },
+  {
+    id: "3",
+    name: "Concours Spécial Master",
+    status: "draft",
+    startDate: "15/04/2026",
+    endDate: "15/05/2026",
+    places: 5,
+    registeredCount: 0,
+  },
+]

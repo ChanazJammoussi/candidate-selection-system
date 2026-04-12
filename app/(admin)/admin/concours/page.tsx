@@ -23,7 +23,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
-import { Slider } from "@/components/ui/slider"
 import {
   Plus,
   Settings,
@@ -34,10 +33,11 @@ import {
   Eye,
   CheckCircle,
   Clock,
+  X,
+  AlertCircle,
 } from "lucide-react"
 import {
   ConcourType,
-  ScoreCritere,
   CONCOUR_TYPE_CONFIGS,
   CONCOUR_TYPE_LABELS,
 } from "@/lib/concours-types"
@@ -56,21 +56,14 @@ interface Competition {
   places: number
   registeredCount: number
   status: "draft" | "open" | "closed" | "results_published"
-  criteria: {
-    gpaWeight: number
-    documentsWeight: number
-    interviewWeight: number
-  }
+  type: ConcourType
+  specialites: string[]
+  formule: string // ex: "notesMaths * 0.4 + notesPhysique * 0.3 + notesLangue * 0.3"
 }
 
 // ----------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------
-
-/** Convertit les coefficients (0–1) en pourcentages entiers (0–100) */
-function variablesToWeights(variables: ScoreCritere[]): Record<string, number> {
-  return Object.fromEntries(variables.map((v) => [v.id, Math.round(v.coefficient * 100)]))
-}
 
 const CHAMP_TYPE_LABELS: Record<string, string> = {
   text:   "Texte",
@@ -78,6 +71,103 @@ const CHAMP_TYPE_LABELS: Record<string, string> = {
   select: "Liste",
   date:   "Date",
   file:   "Fichier",
+}
+
+/**
+ * Vérifie que la formule :
+ * - n'est pas vide
+ * - ne contient que des identifiants, chiffres, opérateurs arithmétiques et parenthèses
+ * - peut être évaluée sans erreur (test avec des valeurs fictives = 0)
+ */
+function validateFormule(formule: string, availableIds: string[]): string | null {
+  if (!formule.trim()) return "La formule ne peut pas être vide."
+  // Remplacer les ids connus par "0" et tenter d'évaluer
+  let expr = formule
+  for (const id of availableIds) {
+    expr = expr.replace(new RegExp(`\\b${id}\\b`, "g"), "0")
+  }
+  // Vérifier qu'il ne reste que des caractères arithmétiques valides
+  if (/[^0-9\s\+\-\*\/\.\(\)]/g.test(expr)) {
+    return "La formule contient des variables inconnues ou des caractères invalides."
+  }
+  try {
+    // eslint-disable-next-line no-new-func
+    const result = new Function(`return ${expr}`)()
+    if (typeof result !== "number" || !isFinite(result)) throw new Error()
+  } catch {
+    return "La formule est invalide (erreur de syntaxe)."
+  }
+  return null
+}
+
+// ----------------------------------------------------------------
+// Composant réutilisable : section formule
+// ----------------------------------------------------------------
+
+function FormulaSection({
+  type,
+  formule,
+  onChange,
+}: {
+  type: ConcourType
+  formule: string
+  onChange: (v: string) => void
+}) {
+  const config = CONCOUR_TYPE_CONFIGS[type]
+  const numericChamps = config.champs.filter((c) => c.type === "number")
+  const availableIds = numericChamps.map((c) => c.id)
+  const error = formule.trim() ? validateFormule(formule, availableIds) : null
+
+  return (
+    <div className="space-y-3">
+      <FieldLabel>Formule de calcul du score</FieldLabel>
+      <p className="text-xs text-muted-foreground -mt-1">
+        Utilisez les identifiants ci-dessous. Opérateurs autorisés : <code className="font-mono">+ - * / ( )</code>
+      </p>
+
+      {/* Variables disponibles — cliquables pour insérer */}
+      <div className="space-y-1">
+        <p className="text-xs font-medium text-muted-foreground">Variables disponibles :</p>
+        <div className="flex flex-wrap gap-1.5">
+          {numericChamps.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => onChange(formule ? `${formule} + ${c.id}` : c.id)}
+              className="rounded border border-border bg-muted/60 px-2 py-0.5 text-xs font-mono hover:bg-muted transition-colors"
+              title={c.label}
+            >
+              {c.id}
+              <span className="ml-1 text-muted-foreground font-sans">({c.label})</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Saisie libre */}
+      <Textarea
+        value={formule}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={`Ex : ${numericChamps[0]?.id ?? "champ1"} * 0.4 + ${numericChamps[1]?.id ?? "champ2"} * 0.6`}
+        rows={3}
+        className="font-mono text-sm"
+      />
+
+      {/* Validation */}
+      {formule.trim() && error && (
+        <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          {error}
+        </div>
+      )}
+      {formule.trim() && !error && (
+        <div className="rounded-md border bg-muted/40 p-3 space-y-0.5">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Formule enregistrée</p>
+          <p className="text-sm font-mono break-words">score = {formule}</p>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ----------------------------------------------------------------
@@ -89,7 +179,7 @@ export default function ConcoursPage() {
   const [showCriteriaDialog, setShowCriteriaDialog] = useState(false)
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null)
 
-  // — État du formulaire de création —
+  // — Formulaire de création —
   const [newCompetition, setNewCompetition] = useState({
     name: "",
     description: "",
@@ -99,38 +189,60 @@ export default function ConcoursPage() {
     places: 10,
   })
   const [selectedType, setSelectedType] = useState<ConcourType | "">("")
-  const [scoreWeights, setScoreWeights] = useState<Record<string, number>>({})
+  const [formule, setFormule] = useState("")
+  const [specialites, setSpecialites] = useState<string[]>([])
+  const [specialiteInput, setSpecialiteInput] = useState("")
 
-  // — État du dialog critères existant —
-  const [criteria, setCriteria] = useState({
-    gpaWeight: 50,
-    documentsWeight: 30,
-    interviewWeight: 20,
-  })
+  // — Dialog configuration (édition) —
+  const [editFormule, setEditFormule] = useState("")
+  const [editSpecialites, setEditSpecialites] = useState<string[]>([])
+  const [editSpecialiteInput, setEditSpecialiteInput] = useState("")
 
   // ----------------------------------------------------------------
 
   const handleTypeChange = (value: ConcourType) => {
     setSelectedType(value)
-    setScoreWeights(variablesToWeights(CONCOUR_TYPE_CONFIGS[value].formuleScore.variables))
+    setFormule("")
   }
 
+  const addTag = (
+    input: string,
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    inputSetter: React.Dispatch<React.SetStateAction<string>>
+  ) => {
+    const v = input.trim()
+    if (v) { setter((prev) => [...prev, v]); inputSetter("") }
+  }
+
+  const createFormulaError =
+    selectedType && formule.trim()
+      ? validateFormule(formule, CONCOUR_TYPE_CONFIGS[selectedType].champs.filter(c => c.type === "number").map(c => c.id))
+      : null
+
+  const editFormulaError =
+    selectedCompetition && editFormule.trim()
+      ? validateFormule(editFormule, CONCOUR_TYPE_CONFIGS[selectedCompetition.type].champs.filter(c => c.type === "number").map(c => c.id))
+      : null
+
   const handleCreateCompetition = () => {
-    console.log("Creating competition:", { ...newCompetition, type: selectedType, scoreWeights })
+    console.log("Creating competition:", { ...newCompetition, type: selectedType, formule, specialites })
     setShowCreateDialog(false)
     setNewCompetition({ name: "", description: "", startDate: "", endDate: "", resultsDate: "", places: 10 })
     setSelectedType("")
-    setScoreWeights({})
+    setFormule("")
+    setSpecialites([])
+    setSpecialiteInput("")
   }
 
   const openCriteriaDialog = (competition: Competition) => {
     setSelectedCompetition(competition)
-    setCriteria(competition.criteria)
+    setEditFormule(competition.formule ?? "")
+    setEditSpecialites(competition.specialites ?? [])
     setShowCriteriaDialog(true)
   }
 
   const handleSaveCriteria = () => {
-    console.log("Saving criteria:", criteria)
+    console.log("Saving:", { formule: editFormule, specialites: editSpecialites })
     setShowCriteriaDialog(false)
   }
 
@@ -147,7 +259,9 @@ export default function ConcoursPage() {
       places: 10,
       registeredCount: 156,
       status: "open",
-      criteria: { gpaWeight: 50, documentsWeight: 30, interviewWeight: 20 },
+      type: "ing_prepa",
+      specialites: ["MP", "PC", "PT"],
+      formule: "notesMaths * 0.40 + notesPhysique * 0.30 + notesInformatique * 0.15 + notesLangue * 0.15",
     },
     {
       id: "2",
@@ -159,7 +273,9 @@ export default function ConcoursPage() {
       places: 10,
       registeredCount: 142,
       status: "results_published",
-      criteria: { gpaWeight: 50, documentsWeight: 30, interviewWeight: 20 },
+      type: "ing_prepa",
+      specialites: ["MP", "PC"],
+      formule: "notesMaths * 0.40 + notesPhysique * 0.30 + notesInformatique * 0.15 + notesLangue * 0.15",
     },
     {
       id: "3",
@@ -171,22 +287,22 @@ export default function ConcoursPage() {
       places: 5,
       registeredCount: 0,
       status: "draft",
-      criteria: { gpaWeight: 60, documentsWeight: 25, interviewWeight: 15 },
+      type: "master",
+      specialites: ["Informatique", "Génie logiciel"],
+      formule: "moyenneGenerale * 0.45 + noteMemoire * 0.25 + notesLangue * 0.20 + experiencePro * 0.10",
     },
   ]
 
   const getStatusBadge = (status: Competition["status"]) => {
     const config = {
-      draft:             { label: "Brouillon",          className: "bg-muted text-muted-foreground",         icon: Edit },
-      open:              { label: "Ouvert",              className: "bg-success text-success-foreground",     icon: CheckCircle },
-      closed:            { label: "Fermé",               className: "bg-warning text-warning-foreground",     icon: Clock },
-      results_published: { label: "Résultats publiés",   className: "bg-primary text-primary-foreground",     icon: Eye },
+      draft:             { label: "Brouillon",        className: "bg-muted text-muted-foreground",     icon: Edit },
+      open:              { label: "Ouvert",            className: "bg-success text-success-foreground", icon: CheckCircle },
+      closed:            { label: "Fermé",             className: "bg-warning text-warning-foreground", icon: Clock },
+      results_published: { label: "Résultats publiés", className: "bg-primary text-primary-foreground", icon: Eye },
     }
     return config[status]
   }
 
-  // Somme des poids pour la validation
-  const weightsTotal = Object.values(scoreWeights).reduce((s, v) => s + v, 0)
   const typeConfig = selectedType ? CONCOUR_TYPE_CONFIGS[selectedType] : null
 
   // ----------------------------------------------------------------
@@ -217,7 +333,6 @@ export default function ConcoursPage() {
             </DialogHeader>
 
             <FieldGroup>
-              {/* Informations de base */}
               <Field>
                 <FieldLabel htmlFor="name">Nom du concours</FieldLabel>
                 <Input
@@ -239,7 +354,6 @@ export default function ConcoursPage() {
                 />
               </Field>
 
-              {/* Type de concours */}
               <Field>
                 <FieldLabel htmlFor="type">Type de concours</FieldLabel>
                 <Select value={selectedType} onValueChange={(v) => handleTypeChange(v as ConcourType)}>
@@ -248,15 +362,49 @@ export default function ConcoursPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {(Object.keys(CONCOUR_TYPE_LABELS) as ConcourType[]).map((key) => (
-                      <SelectItem key={key} value={key}>
-                        {CONCOUR_TYPE_LABELS[key]}
-                      </SelectItem>
+                      <SelectItem key={key} value={key}>{CONCOUR_TYPE_LABELS[key]}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </Field>
 
-              {/* Aperçu des champs de candidature */}
+              {/* Spécialités */}
+              {typeConfig && (
+                <div className="space-y-2">
+                  <FieldLabel>Spécialités acceptées</FieldLabel>
+                  <div className="flex gap-2">
+                    <Input
+                      value={specialiteInput}
+                      onChange={(e) => setSpecialiteInput(e.target.value)}
+                      placeholder="Ex : MP, Informatique…"
+                      onKeyDown={(e) =>
+                        e.key === "Enter" &&
+                        (e.preventDefault(), addTag(specialiteInput, setSpecialites, setSpecialiteInput))
+                      }
+                    />
+                    <Button type="button" variant="outline"
+                      onClick={() => addTag(specialiteInput, setSpecialites, setSpecialiteInput)}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {specialites.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {specialites.map((s) => (
+                        <Badge key={s} variant="secondary" className="flex items-center gap-1">
+                          {s}
+                          <button onClick={() => setSpecialites((prev) => prev.filter((x) => x !== s))}>
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Aucune spécialité → toutes acceptées</p>
+                  )}
+                </div>
+              )}
+
+              {/* Aperçu champs */}
               {typeConfig && (
                 <div className="space-y-2">
                   <FieldLabel>Champs de candidature</FieldLabel>
@@ -268,114 +416,63 @@ export default function ConcoursPage() {
                       >
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{champ.label}</span>
-                          {champ.required && (
-                            <span className="text-destructive text-xs">*</span>
-                          )}
+                          {champ.required && <span className="text-destructive text-xs">*</span>}
                         </div>
                         <div className="flex items-center gap-2">
-                          {champ.unit && (
-                            <span className="text-muted-foreground text-xs">{champ.unit}</span>
-                          )}
+                          {champ.unit && <span className="text-muted-foreground text-xs">{champ.unit}</span>}
                           <Badge variant="outline" className="text-xs">
                             {CHAMP_TYPE_LABELS[champ.type] ?? champ.type}
                           </Badge>
                         </div>
                       </div>
                     ))}
-                    <p className="text-xs text-muted-foreground pt-1">
-                      * champ obligatoire — aperçu en lecture seule
-                    </p>
+                    <p className="text-xs text-muted-foreground pt-1">* champ obligatoire — aperçu en lecture seule</p>
                   </div>
                 </div>
               )}
 
-              {/* Sliders de poids de la formule */}
-              {typeConfig && Object.keys(scoreWeights).length > 0 && (
-                <div className="space-y-3">
-                  <FieldLabel>Formule de score</FieldLabel>
-                  <p className="text-xs text-muted-foreground -mt-1">{typeConfig.formuleScore.description}</p>
-                  <div className="space-y-4">
-                    {typeConfig.formuleScore.variables.map((variable) => (
-                      <div key={variable.id} className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>{variable.label}</span>
-                          <span className="font-medium tabular-nums">{scoreWeights[variable.id] ?? 0}%</span>
-                        </div>
-                        <Slider
-                          value={[scoreWeights[variable.id] ?? 0]}
-                          onValueChange={([val]) =>
-                            setScoreWeights((prev) => ({ ...prev, [variable.id]: val }))
-                          }
-                          min={0}
-                          max={100}
-                          step={5}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <div className={`rounded-md p-3 text-sm ${weightsTotal === 100 ? "bg-muted" : "bg-destructive/10"}`}>
-                    <strong>Total : {weightsTotal}%</strong>
-                    {weightsTotal !== 100 && (
-                      <span className="text-destructive ml-2">(doit être égal à 100%)</span>
-                    )}
-                  </div>
-                </div>
+              {/* Formule manuelle */}
+              {typeConfig && (
+                <FormulaSection
+                  type={selectedType as ConcourType}
+                  formule={formule}
+                  onChange={setFormule}
+                />
               )}
 
               {/* Dates & places */}
               <div className="grid grid-cols-2 gap-4">
                 <Field>
                   <FieldLabel htmlFor="startDate">Date de début</FieldLabel>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={newCompetition.startDate}
-                    onChange={(e) => setNewCompetition({ ...newCompetition, startDate: e.target.value })}
-                  />
+                  <Input id="startDate" type="date" value={newCompetition.startDate}
+                    onChange={(e) => setNewCompetition({ ...newCompetition, startDate: e.target.value })} />
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="endDate">Date de fin</FieldLabel>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={newCompetition.endDate}
-                    onChange={(e) => setNewCompetition({ ...newCompetition, endDate: e.target.value })}
-                  />
+                  <Input id="endDate" type="date" value={newCompetition.endDate}
+                    onChange={(e) => setNewCompetition({ ...newCompetition, endDate: e.target.value })} />
                 </Field>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <Field>
                   <FieldLabel htmlFor="resultsDate">Publication résultats</FieldLabel>
-                  <Input
-                    id="resultsDate"
-                    type="date"
-                    value={newCompetition.resultsDate}
-                    onChange={(e) => setNewCompetition({ ...newCompetition, resultsDate: e.target.value })}
-                  />
+                  <Input id="resultsDate" type="date" value={newCompetition.resultsDate}
+                    onChange={(e) => setNewCompetition({ ...newCompetition, resultsDate: e.target.value })} />
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="places">Nombre de places</FieldLabel>
-                  <Input
-                    id="places"
-                    type="number"
-                    value={newCompetition.places}
-                    onChange={(e) => setNewCompetition({ ...newCompetition, places: parseInt(e.target.value) })}
-                  />
+                  <Input id="places" type="number" value={newCompetition.places}
+                    onChange={(e) => setNewCompetition({ ...newCompetition, places: parseInt(e.target.value) })} />
                 </Field>
               </div>
             </FieldGroup>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-                Annuler
-              </Button>
+              <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Annuler</Button>
               <Button
                 onClick={handleCreateCompetition}
-                disabled={
-                  !selectedType ||
-                  (Object.keys(scoreWeights).length > 0 && weightsTotal !== 100)
-                }
+                disabled={!selectedType || !formule.trim() || !!createFormulaError}
               >
                 Créer
               </Button>
@@ -421,37 +518,36 @@ export default function ConcoursPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Critères d'évaluation</p>
-                  <div className="flex gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      Moyenne: {competition.criteria.gpaWeight}%
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      Documents: {competition.criteria.documentsWeight}%
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      Entretien: {competition.criteria.interviewWeight}%
-                    </Badge>
-                  </div>
+                {/* Spécialités */}
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Spécialités acceptées</p>
+                  {competition.specialites.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {competition.specialites.map((s) => (
+                        <Badge key={s} variant="secondary" className="text-xs">{s}</Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Toutes spécialités acceptées</p>
+                  )}
+                </div>
+
+                {/* Formule */}
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Formule de score</p>
+                  <p className="text-xs text-muted-foreground font-mono break-words">
+                    score = {competition.formule}
+                  </p>
                 </div>
 
                 <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => openCriteriaDialog(competition)}
-                  >
+                  <Button variant="outline" size="sm" className="flex-1"
+                    onClick={() => openCriteriaDialog(competition)}>
                     <Settings className="mr-2 h-4 w-4" />
-                    Critères
+                    Configurer
                   </Button>
-                  <Button variant="outline" size="sm">
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <Button variant="outline" size="sm"><Edit className="h-4 w-4" /></Button>
+                  <Button variant="outline" size="sm"><Trash2 className="h-4 w-4 text-destructive" /></Button>
                 </div>
               </CardContent>
             </Card>
@@ -459,73 +555,66 @@ export default function ConcoursPage() {
         })}
       </div>
 
-      {/* ── Dialog critères (concours existants) ── */}
+      {/* ── Dialog configuration ── */}
       <Dialog open={showCriteriaDialog} onOpenChange={setShowCriteriaDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Critères d'évaluation</DialogTitle>
+            <DialogTitle>Configuration — {selectedCompetition?.name}</DialogTitle>
             <DialogDescription>
-              Définissez les poids de chaque critère pour le calcul du score
+              Modifiez les spécialités acceptées et la formule de calcul du score
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-6 py-4">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <FieldLabel>Moyenne générale</FieldLabel>
-                  <span className="text-sm font-medium">{criteria.gpaWeight}%</span>
-                </div>
-                <Slider
-                  value={[criteria.gpaWeight]}
-                  onValueChange={([value]) => setCriteria({ ...criteria, gpaWeight: value })}
-                  max={100}
-                  step={5}
-                />
-              </div>
 
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <FieldLabel>Qualité des documents</FieldLabel>
-                  <span className="text-sm font-medium">{criteria.documentsWeight}%</span>
-                </div>
-                <Slider
-                  value={[criteria.documentsWeight]}
-                  onValueChange={([value]) => setCriteria({ ...criteria, documentsWeight: value })}
-                  max={100}
-                  step={5}
+          <div className="space-y-6 py-2">
+            {/* Spécialités */}
+            <div className="space-y-2">
+              <FieldLabel>Spécialités acceptées</FieldLabel>
+              <div className="flex gap-2">
+                <Input
+                  value={editSpecialiteInput}
+                  onChange={(e) => setEditSpecialiteInput(e.target.value)}
+                  placeholder="Ajouter une spécialité…"
+                  onKeyDown={(e) =>
+                    e.key === "Enter" &&
+                    (e.preventDefault(), addTag(editSpecialiteInput, setEditSpecialites, setEditSpecialiteInput))
+                  }
                 />
+                <Button type="button" variant="outline"
+                  onClick={() => addTag(editSpecialiteInput, setEditSpecialites, setEditSpecialiteInput)}>
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <FieldLabel>Entretien / Motivation</FieldLabel>
-                  <span className="text-sm font-medium">{criteria.interviewWeight}%</span>
+              {editSpecialites.length > 0 ? (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {editSpecialites.map((s) => (
+                    <Badge key={s} variant="secondary" className="flex items-center gap-1">
+                      {s}
+                      <button onClick={() => setEditSpecialites((prev) => prev.filter((x) => x !== s))}>
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
                 </div>
-                <Slider
-                  value={[criteria.interviewWeight]}
-                  onValueChange={([value]) => setCriteria({ ...criteria, interviewWeight: value })}
-                  max={100}
-                  step={5}
-                />
-              </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Aucune spécialité → toutes acceptées</p>
+              )}
             </div>
 
-            <div className="p-4 rounded-lg bg-muted">
-              <p className="text-sm">
-                <strong>Total: {criteria.gpaWeight + criteria.documentsWeight + criteria.interviewWeight}%</strong>
-                {criteria.gpaWeight + criteria.documentsWeight + criteria.interviewWeight !== 100 && (
-                  <span className="text-destructive ml-2">(doit être égal à 100%)</span>
-                )}
-              </p>
-            </div>
+            {/* Formule manuelle */}
+            {selectedCompetition && (
+              <FormulaSection
+                type={selectedCompetition.type}
+                formule={editFormule}
+                onChange={setEditFormule}
+              />
+            )}
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCriteriaDialog(false)}>
-              Annuler
-            </Button>
+            <Button variant="outline" onClick={() => setShowCriteriaDialog(false)}>Annuler</Button>
             <Button
               onClick={handleSaveCriteria}
-              disabled={criteria.gpaWeight + criteria.documentsWeight + criteria.interviewWeight !== 100}
+              disabled={!editFormule.trim() || !!editFormulaError}
             >
               Enregistrer
             </Button>
