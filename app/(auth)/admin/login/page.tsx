@@ -2,17 +2,17 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { GraduationCap, Eye, EyeOff, Mail, Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
+import { loginAdminAction } from "@/lib/actions/admin"
 
 export default function AdminLoginPage() {
-  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -21,10 +21,15 @@ export default function AdminLoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    setTimeout(() => {
-      router.push("/admin")
+    setError(null)
+    const data = new FormData()
+    data.set("email", formData.email)
+    data.set("password", formData.password)
+    const result = await loginAdminAction(data)
+    if (result?.error) {
+      setError(result.error)
       setIsLoading(false)
-    }, 1000)
+    }
   }
 
   return (
@@ -127,6 +132,10 @@ export default function AdminLoginPage() {
                     Mot de passe oublié ?
                   </Link>
                 </div>
+
+                {error && (
+                  <p className="text-sm text-destructive text-center">{error}</p>
+                )}
 
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? "Connexion..." : "Se connecter"}
