@@ -1,6 +1,3 @@
-"use client"
-
-import { use } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -15,13 +12,26 @@ import {
   Trophy,
 } from "lucide-react"
 import Link from "next/link"
+import { getSession } from "@/lib/session"
+import { prisma } from "@/lib/prisma"
 
-export default function CandidatConcoursDashboard({
+export default async function CandidatConcoursDashboard({
   params,
 }: {
   params: Promise<{ concourId: string }>
 }) {
-  const { concourId } = use(params)
+  const { concourId } = await params
+
+  const session = await getSession()
+  const candidat = session.candidatId
+    ? await prisma.candidat.findUnique({
+        where: { id: session.candidatId },
+        select: { prenom: true, nom: true },
+      })
+    : null
+
+  const prenom = candidat?.prenom ?? "Candidat"
+  const nomComplet = candidat ? `${candidat.prenom} ${candidat.nom}` : ""
 
   const candidatureStatus = "en_examen"
   const documentsProgress = 75
@@ -96,7 +106,7 @@ export default function CandidatConcoursDashboard({
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Bienvenue, Jean</h2>
+          <h2 className="text-2xl font-bold text-foreground">Bienvenue, {prenom}</h2>
           <p className="text-muted-foreground">
             Voici un aperçu de votre candidature au concours d'intégration 2026
           </p>

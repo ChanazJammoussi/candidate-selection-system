@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { GraduationCap, Eye, EyeOff, Mail, Lock, User, Phone } from "lucide-react"
+import { inscrireCandidatAction } from "@/lib/actions/candidat"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,6 +17,7 @@ export default function InscriptionPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [acceptTerms, setAcceptTerms] = useState(false)
   const [formData, setFormData] = useState({
     firstName: "",
@@ -29,22 +31,28 @@ export default function InscriptionPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
+
     if (formData.password !== formData.confirmPassword) {
-      alert("Les mots de passe ne correspondent pas")
+      setError("Les mots de passe ne correspondent pas")
       return
     }
     if (!acceptTerms) {
-      alert("Veuillez accepter les conditions d'utilisation")
+      setError("Veuillez accepter les conditions d'utilisation")
       return
     }
-    
+
     setIsLoading(true)
-    // Simulate registration
-    setTimeout(() => {
-      const concoursId = searchParams.get("concoursId")
-      router.push(concoursId ? `/candidat/${concoursId}` : "/candidat")
-      setIsLoading(false)
-    }, 1000)
+    const result = await inscrireCandidatAction(formData)
+    setIsLoading(false)
+
+    if (!result.success) {
+      setError(result.error)
+      return
+    }
+
+    const concoursId = searchParams.get("concoursId")
+    router.push(concoursId ? `/candidat/${concoursId}` : "/candidat")
   }
 
   return (
@@ -240,6 +248,10 @@ export default function InscriptionPage() {
                   </label>
                 </div>
               </FieldGroup>
+
+              {error && (
+                <p className="text-sm text-destructive text-center">{error}</p>
+              )}
 
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Inscription en cours..." : "S'inscrire"}

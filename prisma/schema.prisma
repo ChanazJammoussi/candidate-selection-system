@@ -1,0 +1,97 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Enums
+// ============================================================
+
+enum ConcoursType {
+  ing_prepa
+  ing_licence
+  master
+}
+
+enum ConcoursStatut {
+  draft
+  open
+  closed
+  results_published
+}
+
+enum CandidatureStatut {
+  en_attente
+  acceptee
+  rejetee
+}
+
+// ============================================================
+// Modèles
+// ============================================================
+
+model Candidat {
+  id        String   @id @default(cuid())
+  prenom    String
+  nom       String
+  cin       String   @unique
+  email     String   @unique
+  phone     String?
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidatures Candidature[]
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  nom       String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}
+
+model Concours {
+  id            String         @id @default(cuid())
+  nom           String
+  description   String?
+  type          ConcoursType
+  statut        ConcoursStatut @default(draft)
+  dateDebut     DateTime
+  dateFin       DateTime
+  dateResultats DateTime
+  places        Int
+  specialites   String[]
+  formule       String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  candidatures Candidature[]
+}
+
+model Candidature {
+  id         String            @id @default(cuid())
+  statut     CandidatureStatut @default(en_attente)
+  score      Float?
+  donnees    Json
+  documents  Json?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  candidatId String
+  concoursId String
+
+  candidat Candidat @relation(fields: [candidatId], references: [id])
+  concours Concours @relation(fields: [concoursId], references: [id])
+
+  @@unique([candidatId, concoursId])
+}

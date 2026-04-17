@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { CONCOURS_OUVERTS, type Concours } from "@/lib/mock-concours"
+import { loginCandidatAction } from "@/lib/actions/candidat"
 
 export default function CandidatLoginPage() {
   const router = useRouter()
@@ -22,6 +23,7 @@ export default function CandidatLoginPage() {
   const [selectedConcours, setSelectedConcours] = useState<Concours | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({ email: "", password: "" })
 
   useEffect(() => {
@@ -41,11 +43,18 @@ export default function CandidatLoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedConcours) return
+    setError(null)
     setIsLoading(true)
-    setTimeout(() => {
-      router.push(`/candidat/${selectedConcours.id}`)
-      setIsLoading(false)
-    }, 1000)
+
+    const result = await loginCandidatAction(formData)
+    setIsLoading(false)
+
+    if (!result.success) {
+      setError(result.error)
+      return
+    }
+
+    router.push(`/candidat/${selectedConcours.id}`)
   }
 
   if (!selectedConcours) return null
@@ -148,6 +157,10 @@ export default function CandidatLoginPage() {
                 Mot de passe oublié ?
               </a>
             </div>
+
+            {error && (
+              <p className="text-sm text-destructive text-center">{error}</p>
+            )}
 
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Connexion en cours..." : "Se connecter"}

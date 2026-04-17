@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: sgci_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: sgci_user
+      POSTGRES_PASSWORD: sgci_password
+      POSTGRES_DB: sgci_db
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
