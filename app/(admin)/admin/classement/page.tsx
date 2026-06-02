@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ConcoursSelector } from "@/components/ui/concours-selector"
-import { MOCK_CONCOURS } from "@/lib/mock-concours"
+import type { ConcoursOption } from "@/components/ui/concours-selector"
+import { fetchCandidaturesRanking, generateRankingAction, fetchConcoursListAction } from "@/lib/actions/concours"
 import {
   Search,
   RefreshCw,
@@ -57,31 +58,31 @@ interface RankedCandidate {
 }
 
 export default function AdminClassementPage() {
+  const [concoursList, setConcoursList] = useState<ConcoursOption[]>([])
   const [selectedConcoursId, setSelectedConcoursId] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
+
+  useEffect(() => { fetchConcoursListAction().then(setConcoursList) }, [])
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
-  const [lastGenerated, setLastGenerated] = useState("15/03/2026 à 14:30")
+  const [lastGenerated, setLastGenerated] = useState<string | null>(null)
+  const [rankedCandidates, setRankedCandidates] = useState<RankedCandidate[]>([])
+  const [isLoading, setIsLoading] = useState(false)
 
-  const concoursSelectionne = MOCK_CONCOURS.find((c) => c.id === selectedConcoursId) ?? null
+  const concoursSelectionne = concoursList.find((c) => c.id === selectedConcoursId) ?? null
 
-  const rankedCandidates: RankedCandidate[] = [
-    { rank: 1, id: "1", name: "Marie Martin", email: "marie.m@email.com", gpaScore: 45, documentsScore: 27, totalScore: 92.5, status: "admis", previousRank: 1 },
-    { rank: 2, id: "2", name: "Pierre Durand", email: "pierre.d@email.com", gpaScore: 44, documentsScore: 28, totalScore: 91.0, status: "admis", previousRank: 3 },
-    { rank: 3, id: "3", name: "Sophie Bernard", email: "sophie.b@email.com", gpaScore: 43, documentsScore: 26, totalScore: 89.5, status: "admis", previousRank: 2 },
-    { rank: 4, id: "4", name: "Lucas Petit", email: "lucas.p@email.com", gpaScore: 42, documentsScore: 26, totalScore: 88.0, status: "admis", previousRank: 4 },
-    { rank: 5, id: "5", name: "Emma Leroy", email: "emma.l@email.com", gpaScore: 41, documentsScore: 27, totalScore: 87.5, status: "admis", previousRank: 5 },
-    { rank: 6, id: "6", name: "Thomas Moreau", email: "thomas.m@email.com", gpaScore: 40, documentsScore: 26, totalScore: 86.0, status: "admis", previousRank: 6 },
-    { rank: 7, id: "7", name: "Julie Simon", email: "julie.s@email.com", gpaScore: 40, documentsScore: 25, totalScore: 85.5, status: "admis", previousRank: 8 },
-    { rank: 8, id: "8", name: "Nicolas Laurent", email: "nicolas.l@email.com", gpaScore: 39, documentsScore: 25, totalScore: 84.0, status: "admis", previousRank: 7 },
-    { rank: 9, id: "9", name: "Camille Roux", email: "camille.r@email.com", gpaScore: 38, documentsScore: 26, totalScore: 83.5, status: "admis", previousRank: 9 },
-    { rank: 10, id: "10", name: "Alexandre Fournier", email: "alex.f@email.com", gpaScore: 38, documentsScore: 24, totalScore: 82.0, status: "admis", previousRank: 10 },
-    { rank: 11, id: "11", name: "Léa Girard", email: "lea.g@email.com", gpaScore: 37, documentsScore: 24, totalScore: 80.5, status: "liste_attente", previousRank: 11 },
-    { rank: 12, id: "12", name: "Jean Dupont", email: "jean.d@email.com", gpaScore: 36, documentsScore: 24, totalScore: 78.5, status: "liste_attente", previousRank: 13 },
-    { rank: 13, id: "13", name: "Manon Bonnet", email: "manon.b@email.com", gpaScore: 35, documentsScore: 23, totalScore: 77.0, status: "en_attente", previousRank: 12 },
-    { rank: 14, id: "14", name: "Hugo Dubois", email: "hugo.d@email.com", gpaScore: 34, documentsScore: 22, totalScore: 75.5, status: "en_attente", previousRank: 14 },
-    { rank: 15, id: "15", name: "Chloé Michel", email: "chloe.m@email.com", gpaScore: 33, documentsScore: 22, totalScore: 74.0, status: "en_attente", previousRank: 15 },
-  ]
+  const handleConcoursChange = async (id: string) => {
+    setSelectedConcoursId(id)
+    if (!id) { setRankedCandidates([]); return }
+    setIsLoading(true)
+    const data = await fetchCandidaturesRanking(id)
+    setRankedCandidates(data.map((c) => ({
+      rank: c.rank, id: c.id, name: c.name, email: c.email,
+      gpaScore: 0, documentsScore: 0, totalScore: c.totalScore,
+      status: c.statut === "acceptee" ? "admis" : c.statut === "liste_attente" ? "liste_attente" : "en_attente",
+    })))
+    setIsLoading(false)
+  }
 
   const filteredCandidates = rankedCandidates.filter(
     (c) =>
@@ -91,8 +92,6 @@ export default function AdminClassementPage() {
 
   const placesAvailable = concoursSelectionne?.places ?? 10
   const formule = selectedConcoursId ? FORMULES[selectedConcoursId] ?? "" : ""
-  const admisCount = rankedCandidates.filter((c) => c.status === "admis").length
-  const listeAttenteCount = rankedCandidates.filter((c) => c.status === "liste_attente").length
 
   const getRankIcon = (rank: number) => {
     switch (rank) {
@@ -131,14 +130,19 @@ export default function AdminClassementPage() {
     setShowConfirmDialog(true)
   }
 
-  const confirmGenerateRanking = () => {
+  const confirmGenerateRanking = async () => {
     setIsGenerating(true)
     setShowConfirmDialog(false)
-    // Simulate ranking generation
-    setTimeout(() => {
-      setIsGenerating(false)
-      setLastGenerated(new Date().toLocaleString("fr-FR"))
-    }, 2000)
+    const result = await generateRankingAction(selectedConcoursId)
+    if (result.candidates) {
+      setRankedCandidates(result.candidates.map((c) => ({
+        rank: c.rank, id: c.id, name: c.name, email: c.email,
+        gpaScore: 0, documentsScore: 0, totalScore: c.totalScore,
+        status: "en_attente" as const,
+      })))
+    }
+    setLastGenerated(new Date().toLocaleString("fr-FR"))
+    setIsGenerating(false)
   }
 
   return (
@@ -175,9 +179,9 @@ export default function AdminClassementPage() {
       <div className="space-y-2">
         <p className="text-sm font-medium text-muted-foreground">Sélectionner un concours</p>
         <ConcoursSelector
-          options={MOCK_CONCOURS}
+          options={concoursList}
           value={selectedConcoursId}
-          onChange={setSelectedConcoursId}
+          onChange={handleConcoursChange}
         />
       </div>
 
@@ -198,34 +202,12 @@ export default function AdminClassementPage() {
         </Card>
         <Card>
           <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-              <CheckCircle className="h-5 w-5 text-success" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{admisCount}</p>
-              <p className="text-sm text-muted-foreground">Candidats admis</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
-              <AlertCircle className="h-5 w-5 text-warning" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{listeAttenteCount}</p>
-              <p className="text-sm text-muted-foreground">Liste d'attente</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-4 p-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
               <RefreshCw className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
               <p className="text-sm font-medium">Dernière mise à jour</p>
-              <p className="text-sm text-muted-foreground">{lastGenerated}</p>
+              <p className="text-sm text-muted-foreground">{lastGenerated ?? "—"}</p>
             </div>
           </CardContent>
         </Card>

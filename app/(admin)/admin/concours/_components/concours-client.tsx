@@ -60,6 +60,7 @@ export interface Competition {
   endDate: string
   resultsDate: string
   places: number
+  placesAttente: number
   registeredCount: number
   status: "draft" | "open" | "closed" | "results_published"
   type: ConcourType
@@ -185,7 +186,8 @@ export default function ConcoursClient({ competitions }: Props) {
     startDate: "",
     endDate: "",
     resultsDate: "",
-    places: 10,
+    places: "10",
+    placesAttente: "5",
   })
   const [selectedType, setSelectedType] = useState<ConcourType | "">("")
   const [formule, setFormule] = useState("")
@@ -195,6 +197,7 @@ export default function ConcoursClient({ competitions }: Props) {
   const [editFormule, setEditFormule] = useState("")
   const [editSpecialites, setEditSpecialites] = useState<string[]>([])
   const [editSpecialiteInput, setEditSpecialiteInput] = useState("")
+  const [editPlacesAttente, setEditPlacesAttente] = useState("")
 
   // ----------------------------------------------------------------
 
@@ -232,14 +235,15 @@ export default function ConcoursClient({ competitions }: Props) {
       dateDebut:    newCompetition.startDate,
       dateFin:      newCompetition.endDate,
       dateResultats:newCompetition.resultsDate,
-      places:       newCompetition.places,
+      places:       parseInt(newCompetition.places as string) || 0,
+      placesAttente: parseInt(newCompetition.placesAttente as string) || 0,
       specialites,
       formule,
     })
     setIsSaving(false)
     if (!result?.error) {
       setShowCreateDialog(false)
-      setNewCompetition({ name: "", description: "", startDate: "", endDate: "", resultsDate: "", places: 10 })
+      setNewCompetition({ name: "", description: "", startDate: "", endDate: "", resultsDate: "", places: "10", placesAttente: "5" })
       setSelectedType("")
       setFormule("")
       setSpecialites([])
@@ -251,13 +255,14 @@ export default function ConcoursClient({ competitions }: Props) {
     setSelectedCompetition(competition)
     setEditFormule(competition.formule ?? "")
     setEditSpecialites(competition.specialites ?? [])
+    setEditPlacesAttente(String(competition.placesAttente ?? 0))
     setShowCriteriaDialog(true)
   }
 
   const handleSaveCriteria = async () => {
     if (!selectedCompetition) return
     setIsSaving(true)
-    await updateConcoursConfigAction(selectedCompetition.id, editSpecialites, editFormule)
+    await updateConcoursConfigAction(selectedCompetition.id, editSpecialites, editFormule, parseInt(editPlacesAttente) || 0)
     setIsSaving(false)
     setShowCriteriaDialog(false)
   }
@@ -438,8 +443,13 @@ export default function ConcoursClient({ competitions }: Props) {
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="places">Nombre de places</FieldLabel>
-                  <Input id="places" type="number" value={newCompetition.places}
-                    onChange={(e) => setNewCompetition({ ...newCompetition, places: parseInt(e.target.value) || 0 })} />
+                  <Input id="places" type="number" min={0} value={newCompetition.places}
+                    onChange={(e) => setNewCompetition({ ...newCompetition, places: e.target.value })} />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="placesAttente">Capacité de la liste d'attente</FieldLabel>
+                  <Input id="placesAttente" type="number" min={0} value={newCompetition.placesAttente}
+                    onChange={(e) => setNewCompetition({ ...newCompetition, placesAttente: e.target.value })} />
                 </Field>
               </div>
             </FieldGroup>
@@ -496,6 +506,13 @@ export default function ConcoursClient({ competitions }: Props) {
                       <div>
                         <p className="text-muted-foreground">Inscrits / Places</p>
                         <p className="font-medium">{competition.registeredCount} / {competition.places}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 col-span-2">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-muted-foreground">Capacité liste d'attente</p>
+                        <p className="font-medium">{competition.placesAttente} places</p>
                       </div>
                     </div>
                   </div>
@@ -581,6 +598,17 @@ export default function ConcoursClient({ competitions }: Props) {
           </DialogHeader>
 
           <div className="space-y-6 py-2">
+            <div className="space-y-2">
+              <FieldLabel htmlFor="editPlacesAttente">Capacité de la liste d'attente</FieldLabel>
+              <Input
+                id="editPlacesAttente"
+                type="number"
+                min={0}
+                value={editPlacesAttente}
+                onChange={(e) => setEditPlacesAttente(e.target.value)}
+              />
+            </div>
+
             <div className="space-y-2">
               <FieldLabel>Spécialités acceptées</FieldLabel>
               <div className="flex gap-2">

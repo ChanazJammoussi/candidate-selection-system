@@ -24,6 +24,7 @@ export default async function ConcoursPage() {
     endDate:        formatDate(c.dateFin),
     resultsDate:    formatDate(c.dateResultats),
     places:         c.places,
+    placesAttente:  c.placesAttente,
     registeredCount:c._count.candidatures,
     status:         c.statut,
     type:           c.type,

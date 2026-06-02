@@ -563,27 +563,13 @@ export default function ProfilClient({ initialData }: { initialData: ProfilData 
                       Ville
                       <EmptyBadge value={profileData.ville} editing={isEditing} />
                     </FieldLabel>
-                    <Select
-                      value={profileData.ville || undefined}
-                      onValueChange={(v) => {
-                        const entry = TUNISIE_DATA[profileData.gouvernorat]?.find((e) => e.ville === v)
-                        setProfileData({
-                          ...profileData,
-                          ville: v,
-                          codePostal: entry?.codePostal ?? profileData.codePostal,
-                        })
-                      }}
-                      disabled={!isEditing || !profileData.gouvernorat}
-                    >
-                      <SelectTrigger id="ville">
-                        <SelectValue placeholder={profileData.gouvernorat ? "Sélectionner…" : "Choisir un gouvernorat d'abord"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(TUNISIE_DATA[profileData.gouvernorat] ?? []).map((e) => (
-                          <SelectItem key={e.ville} value={e.ville}>{e.ville}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      id="ville"
+                      value={profileData.ville}
+                      onChange={(e) => setProfileData({ ...profileData, ville: e.target.value })}
+                      disabled={!isEditing}
+                      placeholder="Saisir votre ville"
+                    />
                   </Field>
                 </div>
 

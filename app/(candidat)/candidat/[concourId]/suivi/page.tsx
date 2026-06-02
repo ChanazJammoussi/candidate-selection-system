@@ -31,14 +31,6 @@ export default function SuiviPage() {
       icon: <FileText className="h-5 w-5" />,
     },
     {
-      id: "2",
-      title: "Vérification des documents",
-      description: "Vos documents sont en cours de vérification par l'administration",
-      date: "12 Mars 2026",
-      status: "completed",
-      icon: <CheckCircle className="h-5 w-5" />,
-    },
-    {
       id: "3",
       title: "Examen du dossier",
       description: "Votre dossier est actuellement examiné par le jury",

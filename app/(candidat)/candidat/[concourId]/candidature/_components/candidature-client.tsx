@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,6 +32,8 @@ import {
 } from "lucide-react"
 import { CONCOUR_TYPE_CONFIGS } from "@/lib/concours-types"
 import type { ConcourType, ConcoursTypeDef } from "@/lib/concours-types"
+import { submitCandidatureAction } from "@/lib/actions/candidat"
+import { toast } from "sonner"
 
 // ----------------------------------------------------------------
 // Types
@@ -83,6 +86,7 @@ interface UploadedFile {
   champId: string
   label: string
   name: string
+  url: string
   status: "pending" | "approved" | "rejected" | "correction"
   uploadDate: string
   size: string
@@ -128,7 +132,8 @@ const SECTIONS_BAC_TN = [
 // Composant
 // ----------------------------------------------------------------
 
-export default function CandidatureClient({ concoursNom, concoursType }: Props) {
+export default function CandidatureClient({ concoursId, concoursNom, concoursType }: Props) {
+  const router     = useRouter()
   const typeConfig = CONCOUR_TYPE_CONFIGS[concoursType]
   const champsPerso = typeConfig.champs.filter((c) =>
     ["nom", "prenom", "cin", "dateNaissance"].includes(c.id))
@@ -179,6 +184,10 @@ export default function CandidatureClient({ concoursNom, concoursType }: Props) 
   const [anneesBlanches, setAnneesBlanches]   = useState("")
 
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadingChampId, setUploadingChampId] = useState<string | null>(null)
+  const fileInputRef  = useRef<HTMLInputElement>(null)
+  const pendingUpload = useRef<{ champId: string; label: string } | null>(null)
 
   const niveauLicenceLabel = (n: AnneeLicence["niveau"]) =>
     n === "1ere" ? "1ère année" : n === "2eme" ? "2ème année" : n === "3eme" ? "3ème année" : ""
@@ -209,13 +218,76 @@ export default function CandidatureClient({ concoursNom, concoursType }: Props) 
   const validatedCount  = uploadedFiles.filter((f) => f.status === "approved" && requiredDocs.some((r) => r.id === f.champId)).length
   const progressPercent = requiredDocs.length > 0 ? Math.round((validatedCount / requiredDocs.length) * 100) : 0
 
-  const handleUpload = (champId: string, label: string) =>
-    setUploadedFiles((prev) => [
-      ...prev.filter((f) => f.champId !== champId),
-      { id: Date.now().toString(), champId, label, name: `${label.replace(/\s+/g, "_")}.pdf`, status: "pending", uploadDate: new Date().toLocaleDateString("fr-FR"), size: "—" },
-    ])
+  const handleUpload = (champId: string, label: string) => {
+    pendingUpload.current = { champId, label }
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !pendingUpload.current) return
+    const { champId, label } = pendingUpload.current
+
+    setUploadedFiles((prev) => prev.filter((f) => f.champId !== champId))
+    setUploadingChampId(champId)
+
+    const fd = new FormData()
+    fd.append("file", file)
+    fd.append("champId", champId)
+    fd.append("concoursId", concoursId)
+
+    const res  = await fetch("/api/upload", { method: "POST", body: fd })
+    const data = await res.json()
+
+    if (data.url) {
+      setUploadedFiles((prev) => [
+        ...prev.filter((f) => f.champId !== champId),
+        {
+          id: Date.now().toString(), champId, label,
+          name: data.fileName, url: data.url, status: "pending",
+          uploadDate: new Date().toLocaleDateString("fr-FR"), size: data.size,
+        },
+      ])
+    } else {
+      toast.error(data.error ?? "Erreur lors de l'envoi du fichier")
+    }
+
+    setUploadingChampId(null)
+    e.target.value = ""
+    pendingUpload.current = null
+  }
+
   const handleDeleteFile = (id: string) =>
     setUploadedFiles((prev) => prev.filter((f) => f.id !== id))
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true)
+    try {
+      const donnees: Record<string, unknown> = {
+        ...formData,
+        bac,
+        ...(concoursType === "ing_prepa" ? { anneesPrepa } : {}),
+        ...(concoursType === "ing_licence" || concoursType === "master" ? { anneesLicence } : {}),
+        ...(aAnneeBlanches === "oui" ? { anneesBlanches: { nb: nbAnneeBlanches, annees: anneesBlanches } } : {}),
+        documents: uploadedFiles.map(({ champId, label, name, url, status, uploadDate, size }) => ({
+          champId, label, fileName: name, url, status, uploadDate, size,
+        })),
+      }
+      const result = await submitCandidatureAction(concoursId, donnees)
+      if (result.success) {
+        toast.success("Candidature soumise avec succès !")
+        router.push(`/candidat/${concoursId}/suivi`)
+        return
+      } else {
+        toast.error(result.error)
+      }
+    } catch (err) {
+      toast.error("Une erreur inattendue est survenue. Veuillez réessayer.")
+      console.error(err)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   const renderChamp = (champ: ConcoursTypeDef["champs"][number]) => {
     if (champ.type === "select" && champ.options) {
@@ -255,6 +327,14 @@ export default function CandidatureClient({ concoursNom, concoursType }: Props) 
 
   return (
     <div className="space-y-6">
+      {/* Input fichier caché — déclenché par handleUpload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png"
+        className="hidden"
+        onChange={handleFileChange}
+      />
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Ma Candidature</h2>
@@ -638,11 +718,14 @@ export default function CandidatureClient({ concoursNom, concoursType }: Props) 
                         </div>
                         <div className="flex items-center gap-2">
                           {uploaded ? (
-                            <Badge variant="outline" className={STATUS_CONFIG[uploaded.status].className}>
-                              {STATUS_CONFIG[uploaded.status].label}
-                            </Badge>
+                            <Check className="h-4 w-4 text-success" />
+                          ) : uploadingChampId === doc.id ? (
+                            <Button size="sm" disabled>
+                              <Clock className="h-4 w-4 mr-1 animate-spin" />Envoi…
+                            </Button>
                           ) : (
-                            <Button size="sm" onClick={() => handleUpload(doc.id, doc.label)}>
+                            <Button size="sm" onClick={() => handleUpload(doc.id, doc.label)}
+                              disabled={uploadingChampId !== null}>
                               <Upload className="h-4 w-4 mr-1" />Uploader
                             </Button>
                           )}
@@ -679,11 +762,16 @@ export default function CandidatureClient({ concoursNom, concoursType }: Props) 
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className={STATUS_CONFIG[file.status].className}>
-                            {STATUS_CONFIG[file.status].label}
-                          </Badge>
-                          <Button variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon"><Download className="h-4 w-4" /></Button>
+                          {file.url && (
+                            <a href={file.url} target="_blank" rel="noopener noreferrer">
+                              <Button variant="ghost" size="icon" type="button"><Eye className="h-4 w-4" /></Button>
+                            </a>
+                          )}
+                          {file.url && (
+                            <a href={file.url} download={file.name}>
+                              <Button variant="ghost" size="icon" type="button"><Download className="h-4 w-4" /></Button>
+                            </a>
+                          )}
                           {file.status !== "approved" && (
                             <Button variant="ghost" size="icon" onClick={() => handleDeleteFile(file.id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
@@ -699,8 +787,11 @@ export default function CandidatureClient({ concoursNom, concoursType }: Props) 
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setActiveTab("academic")}>Précédent</Button>
-              <Button disabled={requiredDocs.some((r) => !uploadedFiles.find((f) => f.champId === r.id))}>
-                Soumettre ma candidature
+              <Button
+                disabled={isSubmitting}
+                onClick={handleSubmit}
+              >
+                {isSubmitting ? "Envoi en cours…" : "Soumettre ma candidature"}
               </Button>
             </div>
           </div>

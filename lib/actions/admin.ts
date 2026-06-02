@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { redirect } from "next/navigation"
+import { revalidatePath } from "next/cache"
 
 const LoginSchema = z.object({
   email:    z.string().email(),
@@ -38,4 +39,19 @@ export async function loginAdminAction(formData: FormData) {
   await session.save()
 
   redirect("/admin")
+}
+
+export async function updateCandidatureStatutAction(
+  candidatureId: string,
+  statut: "en_attente" | "acceptee" | "rejetee" | "liste_attente"
+) {
+  await prisma.candidature.update({
+    where: { id: candidatureId },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data: { statut: statut as any },
+  })
+  revalidatePath("/admin/candidats")
+  revalidatePath("/admin/candidatures")
+  revalidatePath("/admin")
+  return { success: true }
 }

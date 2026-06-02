@@ -1,72 +1,74 @@
-"use client"
-
+import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import {
-  Users,
-  FileText,
-  CheckCircle,
-  Clock,
-  TrendingUp,
-  ArrowRight,
-  UserPlus,
-  AlertCircle,
-} from "lucide-react"
+import { Users, CheckCircle, Clock, TrendingUp, ArrowRight, UserPlus, AlertCircle } from "lucide-react"
 import Link from "next/link"
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-} from "recharts"
+import { DashboardCharts } from "./_components/dashboard-charts"
 
-export default function AdminDashboard() {
-  // Mock data
-  const stats = {
-    totalCandidats: 156,
-    candidaturesSoumises: 142,
-    candidatsAcceptes: 10,
-    enAttente: 28,
+const STATUS_LABELS: Record<string, string> = {
+  acceptee:      "Admis",
+  liste_attente: "Liste d'attente",
+  en_attente:    "En attente",
+  rejetee:       "Rejeté",
+}
+const STATUS_COLORS: Record<string, string> = {
+  acceptee:      "hsl(var(--success))",
+  liste_attente: "hsl(var(--warning))",
+  en_attente:    "hsl(var(--muted-foreground))",
+  rejetee:       "hsl(var(--destructive))",
+}
+
+export default async function AdminDashboard() {
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+  const [
+    totalCandidats,
+    totalCandidatures,
+    acceptees,
+    enAttente,
+    candidaturesRaw,
+    statusGroups,
+    recentRaw,
+  ] = await Promise.all([
+    prisma.candidat.count(),
+    prisma.candidature.count(),
+    prisma.candidature.count({ where: { statut: "acceptee" } }),
+    prisma.candidature.count({ where: { statut: "en_attente" } }),
+    prisma.candidature.findMany({
+      where: { createdAt: { gte: thirtyDaysAgo } },
+      select: { createdAt: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.candidature.groupBy({ by: ["statut"], _count: { _all: true } }),
+    prisma.candidature.findMany({
+      take: 5,
+      orderBy: { createdAt: "desc" },
+      include: { candidat: { select: { nom: true, prenom: true, email: true } } },
+    }),
+  ])
+
+  // Trend : group by day
+  const trendMap = new Map<string, number>()
+  for (const c of candidaturesRaw) {
+    const day = c.createdAt.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })
+    trendMap.set(day, (trendMap.get(day) ?? 0) + 1)
   }
+  const trendData = Array.from(trendMap.entries()).map(([date, count]) => ({ date, count }))
 
-  const candidaturesTrend = [
-    { date: "1 Mar", count: 12 },
-    { date: "5 Mar", count: 28 },
-    { date: "10 Mar", count: 45 },
-    { date: "15 Mar", count: 78 },
-    { date: "20 Mar", count: 112 },
-    { date: "25 Mar", count: 142 },
-  ]
+  const statusData = statusGroups.map((g) => ({
+    name:  STATUS_LABELS[g.statut] ?? g.statut,
+    value: g._count._all,
+    color: STATUS_COLORS[g.statut] ?? "hsl(var(--muted))",
+  }))
 
-  const statusDistribution = [
-    { name: "Admis", value: 10, color: "hsl(var(--success))" },
-    { name: "Liste d'attente", value: 15, color: "hsl(var(--warning))" },
-    { name: "En examen", value: 45, color: "hsl(var(--primary))" },
-    { name: "En attente", value: 28, color: "hsl(var(--muted))" },
-  ]
-
-  const documentStats = [
-    { name: "CV", validated: 120, pending: 22 },
-    { name: "Relevé", validated: 115, pending: 27 },
-    { name: "Diplôme", validated: 100, pending: 42 },
-    { name: "Lettre", validated: 95, pending: 47 },
-  ]
-
-  const recentCandidates = [
-    { name: "Lucas Martin", email: "lucas.m@email.com", date: "Il y a 2h", status: "pending" },
-    { name: "Emma Bernard", email: "emma.b@email.com", date: "Il y a 3h", status: "en_examen" },
-    { name: "Hugo Petit", email: "hugo.p@email.com", date: "Il y a 5h", status: "pending" },
-    { name: "Léa Dubois", email: "lea.d@email.com", date: "Il y a 6h", status: "en_examen" },
-  ]
+  const recentCandidates = recentRaw.map((c) => ({
+    name:   `${c.candidat.prenom} ${c.candidat.nom}`,
+    email:  c.candidat.email,
+    date:   c.createdAt.toLocaleDateString("fr-FR"),
+    statut: c.statut as string,
+  }))
 
   return (
     <div className="space-y-6">
@@ -74,13 +76,11 @@ export default function AdminDashboard() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Tableau de bord</h2>
-          <p className="text-muted-foreground">Vue d'ensemble des candidatures au concours 2026</p>
+          <p className="text-muted-foreground">Vue d'ensemble des candidatures</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <Link href="/admin/classement">
-              Générer classement
-            </Link>
+            <Link href="/admin/classement">Générer classement</Link>
           </Button>
           <Button asChild>
             <Link href="/admin/candidats">
@@ -91,46 +91,38 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total candidats
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total candidats</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalCandidats}</div>
+            <div className="text-2xl font-bold">{totalCandidats}</div>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <TrendingUp className="h-3 w-3 text-success" />
-              +12% depuis hier
+              {totalCandidatures} candidatures soumises
             </p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Candidats acceptés
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Candidats acceptés</CardTitle>
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.candidatsAcceptes}</div>
-            <p className="text-xs text-muted-foreground">10 places disponibles</p>
+            <div className="text-2xl font-bold">{acceptees}</div>
+            <p className="text-xs text-muted-foreground">sur {totalCandidatures} candidatures</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              En attente de traitement
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">En attente de traitement</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.enAttente}</div>
+            <div className="text-2xl font-bold">{enAttente}</div>
             <div className="flex items-center gap-1 text-xs text-warning">
               <AlertCircle className="h-3 w-3" />
               Nécessite attention
@@ -139,165 +131,59 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Charts Row */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Candidatures Trend */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Évolution des candidatures</CardTitle>
-            <CardDescription>Nombre de candidatures sur le mois</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={candidaturesTrend}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="date" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="count"
-                    stroke="hsl(var(--primary))"
-                    fill="hsl(var(--primary))"
-                    fillOpacity={0.2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Charts */}
+      <DashboardCharts trendData={trendData} statusData={statusData} />
 
-        {/* Status Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Répartition par statut</CardTitle>
-            <CardDescription>Distribution des candidatures par statut</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64 flex items-center">
-              <ResponsiveContainer width="50%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statusDistribution}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {statusDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex-1 space-y-2">
-                {statusDistribution.map((item) => (
-                  <div key={item.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="h-3 w-3 rounded-full"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      <span className="text-sm">{item.name}</span>
-                    </div>
-                    <span className="font-medium">{item.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Document Stats & Recent */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Document Validation Stats */}
-        <Card>
-          <CardHeader>
-            <CardTitle>État des documents</CardTitle>
-            <CardDescription>Documents validés vs en attente</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={documentStats}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="name" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Bar dataKey="validated" fill="hsl(var(--success))" name="Validés" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="pending" fill="hsl(var(--warning))" name="En attente" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Candidates */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Candidatures récentes</CardTitle>
-              <CardDescription>Dernières candidatures reçues</CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/admin/candidats">
-                Voir tout
-                <ArrowRight className="ml-1 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
+      {/* Recent */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Candidatures récentes</CardTitle>
+            <CardDescription>Dernières candidatures reçues</CardDescription>
+          </div>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/admin/candidats">
+              Voir tout
+              <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {recentCandidates.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">Aucune candidature pour le moment.</p>
+          ) : (
             <div className="space-y-4">
-              {recentCandidates.map((candidate, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between py-2 border-b border-border last:border-0"
-                >
+              {recentCandidates.map((c, i) => (
+                <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                   <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
-                      {candidate.name.split(" ").map((n) => n[0]).join("")}
+                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-sm">
+                      {c.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                     </div>
                     <div>
-                      <p className="font-medium">{candidate.name}</p>
-                      <p className="text-sm text-muted-foreground">{candidate.email}</p>
+                      <p className="font-medium">{c.name}</p>
+                      <p className="text-sm text-muted-foreground">{c.email}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{candidate.date}</span>
-                    <Badge
-                      variant="outline"
+                    <span className="text-xs text-muted-foreground">{c.date}</span>
+                    <Badge variant="outline"
                       className={
-                        candidate.status === "pending"
-                          ? "bg-warning/10 text-warning border-warning/20"
-                          : "bg-primary/10 text-primary border-primary/20"
+                        c.statut === "acceptee"
+                          ? "bg-success/10 text-success border-success/20"
+                          : c.statut === "rejetee"
+                          ? "bg-destructive/10 text-destructive border-destructive/20"
+                          : "bg-warning/10 text-warning border-warning/20"
                       }
                     >
-                      {candidate.status === "pending" ? "En attente" : "En examen"}
+                      {STATUS_LABELS[c.statut] ?? c.statut}
                     </Badge>
                   </div>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

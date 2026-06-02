@@ -4,6 +4,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import { revalidatePath } from "next/cache";
 
 // ── Schéma de validation ──────────────────────────────────────
 
@@ -60,6 +61,37 @@ export async function inscrireCandidatAction(
   });
 
   return { success: true, data: { id: candidat.id } };
+}
+
+// ── Action : soumission d'une candidature ────────────────────
+
+export async function submitCandidatureAction(
+  concoursId: string,
+  donnees: Record<string, unknown>
+): Promise<ActionResult<{ id: string }>> {
+  const session = await getSession();
+  if (!session.candidatId) {
+    return { success: false, error: "Vous devez être connecté pour soumettre une candidature." };
+  }
+
+  const concours = await prisma.concours.findUnique({ where: { id: concoursId } });
+  if (!concours) return { success: false, error: "Concours introuvable." };
+  if (concours.statut !== "open") {
+    return { success: false, error: "Ce concours n'est plus ouvert aux candidatures." };
+  }
+
+  const docs = Array.isArray((donnees as Record<string, unknown>).documents)
+    ? (donnees as Record<string, unknown>).documents
+    : undefined
+
+  const candidature = await prisma.candidature.upsert({
+    where: { candidatId_concoursId: { candidatId: session.candidatId, concoursId } },
+    update: { donnees, ...(docs !== undefined ? { documents: docs as never } : {}) },
+    create: { candidatId: session.candidatId, concoursId, donnees, ...(docs !== undefined ? { documents: docs as never } : {}) },
+  });
+
+  revalidatePath(`/candidat/${concoursId}/candidature`);
+  return { success: true, data: { id: candidature.id } };
 }
 
 // ── Action : connexion d'un candidat ─────────────────────────
