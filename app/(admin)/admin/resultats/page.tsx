@@ -57,12 +57,8 @@ export default function AdminResultatsPage() {
   }
 
   const handleSendNotifications = () => {
-    setIsSendingNotifications(true)
-    setTimeout(() => {
-      setIsSendingNotifications(false)
-      setShowNotifyDialog(false)
-      toast.success("Notifications envoyées.")
-    }, 1500)
+    setShowNotifyDialog(false)
+    toast.info("Envoi d'emails non encore configuré — intégration SMTP requise.")
   }
 
   const r = resultats
@@ -76,11 +72,10 @@ export default function AdminResultatsPage() {
         </div>
         {concoursSelectionne && (
           <div className="flex gap-2">
-            <Button variant="outline">
-              <Download className="mr-2 h-4 w-4" />Exporter PDF
-            </Button>
-            <Button variant="outline">
-              <Download className="mr-2 h-4 w-4" />Exporter Excel
+            <Button variant="outline" asChild>
+              <a href={`/api/admin/export?concoursId=${selectedConcoursId}`} download>
+                <Download className="mr-2 h-4 w-4" />Exporter JSON
+              </a>
             </Button>
           </div>
         )}

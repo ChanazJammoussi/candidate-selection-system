@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,13 +8,32 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Bell, Lock, User, Globe, Shield, Eye, EyeOff, Check } from "lucide-react"
+import { Bell, Lock, User, Globe, Shield, Eye, EyeOff, Check, Loader2 } from "lucide-react"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
+  desactiverCompteAction,
+  supprimerCompteAction,
+  deconnecterSessionAction,
+  fetchCurrentCandidatAction,
+} from "@/lib/actions/candidat"
 
 export default function CandidatParametresPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [isPending, startTransition] = useTransition()
+  const [compte, setCompte] = useState({ firstName: "", lastName: "", email: "", phone: "" })
+
+  useEffect(() => {
+    fetchCurrentCandidatAction().then((data) => {
+      if (data) setCompte({ firstName: data.prenom, lastName: data.nom, email: data.email, phone: data.phone ?? "" })
+    })
+  }, [])
 
   const [notifications, setNotifications] = useState({
     email: true,
@@ -67,21 +86,21 @@ export default function CandidatParametresPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">Prénom</Label>
-                  <Input id="firstName" defaultValue="Ahmed" />
+                  <Input id="firstName" value={compte.firstName} onChange={(e) => setCompte({ ...compte, firstName: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lastName">Nom</Label>
-                  <Input id="lastName" defaultValue="Ben Ali" />
+                  <Input id="lastName" value={compte.lastName} onChange={(e) => setCompte({ ...compte, lastName: e.target.value })} />
                 </div>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="email">Adresse email</Label>
-                  <Input id="email" type="email" defaultValue="ahmed.benali@email.com" />
+                  <Input id="email" type="email" value={compte.email} onChange={(e) => setCompte({ ...compte, email: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Téléphone</Label>
-                  <Input id="phone" type="tel" defaultValue="+216 55 123 456" />
+                  <Input id="phone" type="tel" value={compte.phone} onChange={(e) => setCompte({ ...compte, phone: e.target.value })} />
                 </div>
               </div>
               <Button onClick={handleSave} className="gap-2">
@@ -101,19 +120,64 @@ export default function CandidatParametresPage() {
                 <div>
                   <p className="font-medium">Desactiver le compte</p>
                   <p className="text-sm text-muted-foreground">
-                    Votre compte sera temporairement desactive
+                    Votre compte sera temporairement desactive. Vous pourrez le reactiver via l'administrateur.
                   </p>
                 </div>
-                <Button variant="outline">Desactiver</Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" disabled={isPending}>Desactiver</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Désactiver votre compte ?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Votre compte sera désactivé et vous serez déconnecté. Vous ne pourrez plus vous connecter
+                        jusqu'à ce qu'un administrateur réactive votre compte.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => startTransition(async () => { await desactiverCompteAction() })}
+                      >
+                        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Désactiver
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-medium">Supprimer le compte</p>
                   <p className="text-sm text-muted-foreground">
-                    Cette action est irreversible et supprimera toutes vos donnees
+                    Cette action est irreversible et supprimera toutes vos donnees ainsi que vos candidatures.
                   </p>
                 </div>
-                <Button variant="destructive">Supprimer</Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={isPending}>Supprimer</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Supprimer définitivement votre compte ?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Cette action est <strong>irréversible</strong>. Toutes vos données personnelles,
+                        candidatures et documents seront définitivement supprimés.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={() => startTransition(async () => { await supprimerCompteAction() })}
+                      >
+                        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Supprimer définitivement
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </CardContent>
           </Card>
@@ -237,19 +301,20 @@ export default function CandidatParametresPage() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
                 <div>
-                  <p className="font-medium">Chrome sur Windows</p>
-                  <p className="text-sm text-muted-foreground">Alger, Algerie - Actif maintenant</p>
+                  <p className="font-medium">Session actuelle</p>
+                  <p className="text-sm text-muted-foreground">Ce navigateur — Connecté maintenant</p>
                 </div>
-                <span className="text-xs bg-success/10 text-success px-2 py-1 rounded-full">Session actuelle</span>
+                <span className="text-xs bg-success/10 text-success px-2 py-1 rounded-full">Active</span>
               </div>
-              <div className="flex items-center justify-between p-4 rounded-lg border">
-                <div>
-                  <p className="font-medium">Safari sur iPhone</p>
-                  <p className="text-sm text-muted-foreground">Alger, Algerie - Il y a 2 jours</p>
-                </div>
-                <Button variant="outline" size="sm">Deconnecter</Button>
-              </div>
-              <Button variant="outline" className="w-full">Deconnecter toutes les autres sessions</Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={isPending}
+                onClick={() => startTransition(() => deconnecterSessionAction())}
+              >
+                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Se déconnecter
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

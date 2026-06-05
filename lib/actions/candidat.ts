@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 // ── Schéma de validation ──────────────────────────────────────
 
@@ -94,6 +95,81 @@ export async function submitCandidatureAction(
   return { success: true, data: { id: candidature.id } };
 }
 
+// ── Action : mise à jour du profil ───────────────────────────
+
+const UpdateProfilSchema = z.object({
+  firstName:      z.string().min(2, "Le prénom doit contenir au moins 2 caractères"),
+  lastName:       z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
+  cin:            z.string().min(8, "Le CIN est invalide"),
+  email:          z.string().email("Email invalide"),
+  phone:          z.string().optional(),
+  birthDate:      z.string().optional(),
+  gouvernorat:    z.string().optional(),
+  ville:          z.string().optional(),
+  codePostal:     z.string().optional(),
+  adresse:        z.string().optional(),
+  diploma:        z.string().optional(),
+  institution:    z.string().optional(),
+  specialization: z.string().optional(),
+  graduationYear: z.string().optional(),
+  gpa:            z.string().optional(),
+});
+
+export async function updateProfilAction(
+  input: z.infer<typeof UpdateProfilSchema>
+): Promise<ActionResult> {
+  const session = await getSession();
+  if (!session.candidatId) {
+    return { success: false, error: "Vous devez être connecté." };
+  }
+
+  const parsed = UpdateProfilSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.errors[0].message };
+  }
+
+  const {
+    firstName, lastName, cin, email, phone,
+    birthDate, gouvernorat, ville, codePostal, adresse,
+    diploma, institution, specialization, graduationYear, gpa,
+  } = parsed.data;
+
+  const conflict = await prisma.candidat.findFirst({
+    where: {
+      OR: [{ email }, { cin }],
+      NOT: { id: session.candidatId },
+    },
+  });
+  if (conflict) {
+    const champ = conflict.email === email ? "email" : "CIN";
+    return { success: false, error: `Ce ${champ} est déjà utilisé par un autre compte.` };
+  }
+
+  await prisma.candidat.update({
+    where: { id: session.candidatId },
+    data: {
+      prenom:         firstName,
+      nom:            lastName,
+      cin,
+      email,
+      phone:          phone          ?? null,
+      birthDate:      birthDate      ?? null,
+      gouvernorat:    gouvernorat    ?? null,
+      ville:          ville          ?? null,
+      codePostal:     codePostal     ?? null,
+      adresse:        adresse        ?? null,
+      diploma:        diploma        ?? null,
+      institution:    institution    ?? null,
+      specialization: specialization ?? null,
+      graduationYear: graduationYear ?? null,
+      gpa:            gpa            ?? null,
+    },
+  });
+
+  revalidatePath("/candidat");
+  return { success: true, data: undefined };
+}
+
 // ── Action : connexion d'un candidat ─────────────────────────
 
 const LoginSchema = z.object({
@@ -111,23 +187,74 @@ export async function loginCandidatAction(
 
   const { email, password } = parsed.data;
 
-  // 1. Trouver le candidat par email
   const candidat = await prisma.candidat.findUnique({ where: { email } });
   if (!candidat) {
     return { success: false, error: "Aucun compte trouvé avec cette adresse email." };
   }
 
-  // 2. Vérifier le mot de passe
+  if (!candidat.isActive) {
+    return { success: false, error: "Ce compte a été désactivé. Contactez l'administrateur." };
+  }
+
   const valide = await bcrypt.compare(password, candidat.password);
   if (!valide) {
     return { success: false, error: "Mot de passe incorrect." };
   }
 
-  // 3. Créer la session
   const session = await getSession();
   session.candidatId = candidat.id;
   session.candidatEmail = candidat.email;
   await session.save();
 
   return { success: true, data: { id: candidat.id } };
+}
+
+// ── Action : récupérer les infos du candidat connecté ────────
+
+export async function fetchCurrentCandidatAction() {
+  const session = await getSession();
+  if (!session.candidatId) return null;
+  return prisma.candidat.findUnique({
+    where: { id: session.candidatId },
+    select: { prenom: true, nom: true, email: true, phone: true },
+  });
+}
+
+// ── Action : déconnexion ──────────────────────────────────────
+
+export async function deconnecterSessionAction(): Promise<void> {
+  const session = await getSession();
+  await session.destroy();
+  redirect("/candidat/login");
+}
+
+// ── Action : désactivation du compte ─────────────────────────
+
+export async function desactiverCompteAction(): Promise<ActionResult> {
+  const session = await getSession();
+  if (!session.candidatId) {
+    return { success: false, error: "Non authentifié." };
+  }
+  await prisma.candidat.update({
+    where: { id: session.candidatId },
+    data:  { isActive: false },
+  });
+  await session.destroy();
+  redirect("/candidat/login");
+}
+
+// ── Action : suppression du compte ───────────────────────────
+
+export async function supprimerCompteAction(): Promise<ActionResult> {
+  const session = await getSession();
+  if (!session.candidatId) {
+    return { success: false, error: "Non authentifié." };
+  }
+  const candidatId = session.candidatId;
+  await prisma.$transaction([
+    prisma.candidature.deleteMany({ where: { candidatId } }),
+    prisma.candidat.delete({ where: { id: candidatId } }),
+  ]);
+  await session.destroy();
+  redirect("/");
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,9 +9,37 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Settings, Bell, Shield, Database, Mail, Save } from "lucide-react"
+import { Settings, Bell, Shield, Database, Mail, Save, Loader2, CheckCircle } from "lucide-react"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { viderCacheAction, optimiserDbAction, reinitialiserDonneesAction, fetchSystemStatsAction } from "@/lib/actions/admin"
+import { toast } from "sonner"
 
 export default function ParametresPage() {
+  const [isPending, startTransition] = useTransition()
+  const [lastAction, setLastAction] = useState<string | null>(null)
+  const [stats, setStats] = useState<{ candidats: number; documents: number } | null>(null)
+
+  useEffect(() => { fetchSystemStatsAction().then(setStats) }, [])
+
+  const runAction = (label: string, fn: () => Promise<{ success: boolean }>) => {
+    startTransition(async () => {
+      const result = await fn()
+      if (result.success) {
+        setLastAction(label)
+        setTimeout(() => setLastAction(null), 3000)
+        toast.success(`${label} effectué avec succès`)
+      } else {
+        toast.error(`Erreur lors de : ${label}`)
+      }
+    })
+  }
+
+  const saveSettings = (section: string) => toast.success(`${section} enregistré`)
+
   const [notifications, setNotifications] = useState({
     email: true,
     newCandidat: true,
@@ -81,7 +109,7 @@ export default function ParametresPage() {
                   <Input id="support-phone" defaultValue="+33 1 23 45 67 89" />
                 </div>
               </div>
-              <Button className="gap-2">
+              <Button className="gap-2" onClick={() => saveSettings("Paramètres")}>
                 <Save className="h-4 w-4" />
                 Enregistrer
               </Button>
@@ -108,7 +136,7 @@ export default function ParametresPage() {
                 <Switch id="registration-open" defaultChecked />
                 <Label htmlFor="registration-open">Inscriptions ouvertes</Label>
               </div>
-              <Button className="gap-2">
+              <Button className="gap-2" onClick={() => saveSettings("Paramètres")}>
                 <Save className="h-4 w-4" />
                 Enregistrer
               </Button>
@@ -163,7 +191,7 @@ export default function ParametresPage() {
                   onCheckedChange={(checked) => setNotifications({ ...notifications, statusChange: checked })}
                 />
               </div>
-              <Button className="gap-2">
+              <Button className="gap-2" onClick={() => saveSettings("Paramètres")}>
                 <Save className="h-4 w-4" />
                 Enregistrer
               </Button>
@@ -250,7 +278,7 @@ L'équipe Concours National`}
                 <Switch id="require-special" />
                 <Label htmlFor="require-special">Exiger un caractère spécial</Label>
               </div>
-              <Button className="gap-2">
+              <Button className="gap-2" onClick={() => saveSettings("Paramètres")}>
                 <Save className="h-4 w-4" />
                 Enregistrer
               </Button>
@@ -285,7 +313,7 @@ L'équipe Concours National`}
                 <Switch id="2fa" />
                 <Label htmlFor="2fa">Authentification à deux facteurs</Label>
               </div>
-              <Button className="gap-2">
+              <Button className="gap-2" onClick={() => saveSettings("Paramètres")}>
                 <Save className="h-4 w-4" />
                 Enregistrer
               </Button>
@@ -303,24 +331,32 @@ L'équipe Concours National`}
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-lg border bg-muted/50 p-4">
                   <p className="text-sm text-muted-foreground">Candidats enregistrés</p>
-                  <p className="text-2xl font-bold">1,234</p>
+                  <p className="text-2xl font-bold">{stats ? stats.candidats.toLocaleString("fr") : "…"}</p>
                 </div>
                 <div className="rounded-lg border bg-muted/50 p-4">
                   <p className="text-sm text-muted-foreground">Documents stockés</p>
-                  <p className="text-2xl font-bold">3,567</p>
+                  <p className="text-2xl font-bold">{stats ? stats.documents.toLocaleString("fr") : "…"}</p>
                 </div>
                 <div className="rounded-lg border bg-muted/50 p-4">
-                  <p className="text-sm text-muted-foreground">Espace utilisé</p>
-                  <p className="text-2xl font-bold">2.4 GB</p>
+                  <p className="text-sm text-muted-foreground">Export disponible</p>
+                  <p className="text-2xl font-bold">JSON</p>
                 </div>
                 <div className="rounded-lg border bg-muted/50 p-4">
-                  <p className="text-sm text-muted-foreground">Dernière sauvegarde</p>
-                  <p className="text-2xl font-bold">Il y a 2h</p>
+                  <p className="text-sm text-muted-foreground">Base de données</p>
+                  <p className="text-2xl font-bold">PostgreSQL</p>
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline">Exporter les données</Button>
-                <Button variant="outline">Créer une sauvegarde</Button>
+                <Button variant="outline" asChild>
+                  <a href="/api/admin/export" download>
+                    Exporter les données
+                  </a>
+                </Button>
+                <Button variant="outline" asChild>
+                  <a href="/api/admin/export" download>
+                    Créer une sauvegarde
+                  </a>
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -334,23 +370,63 @@ L'équipe Concours National`}
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <p className="font-medium">Vider le cache</p>
-                  <p className="text-sm text-muted-foreground">Supprime les fichiers temporaires</p>
+                  <p className="text-sm text-muted-foreground">Revalide toutes les pages du site</p>
                 </div>
-                <Button variant="outline" size="sm">Exécuter</Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isPending}
+                  onClick={() => runAction("Vider le cache", viderCacheAction)}
+                >
+                  {isPending && lastAction === null ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : null}
+                  {lastAction === "Vider le cache" ? <CheckCircle className="mr-2 h-3 w-3 text-success" /> : null}
+                  Exécuter
+                </Button>
               </div>
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <p className="font-medium">Optimiser la base de données</p>
-                  <p className="text-sm text-muted-foreground">Améliore les performances</p>
+                  <p className="text-sm text-muted-foreground">Lance VACUUM ANALYZE sur PostgreSQL</p>
                 </div>
-                <Button variant="outline" size="sm">Exécuter</Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isPending}
+                  onClick={() => runAction("Optimiser la base de données", optimiserDbAction)}
+                >
+                  {isPending ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : null}
+                  {lastAction === "Optimiser la base de données" ? <CheckCircle className="mr-2 h-3 w-3 text-success" /> : null}
+                  Exécuter
+                </Button>
               </div>
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <p className="font-medium text-destructive">Réinitialiser les données de test</p>
-                  <p className="text-sm text-muted-foreground">Attention : action irréversible</p>
+                  <p className="text-sm text-muted-foreground">Supprime tous les candidats et candidatures</p>
                 </div>
-                <Button variant="destructive" size="sm">Exécuter</Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" disabled={isPending}>Exécuter</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Réinitialiser toutes les données ?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Cette action supprimera <strong>définitivement</strong> tous les candidats et leurs
+                        candidatures. Les comptes administrateurs seront conservés. Cette action est irréversible.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={() => runAction("Réinitialiser", reinitialiserDonneesAction)}
+                      >
+                        Réinitialiser définitivement
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </CardContent>
           </Card>

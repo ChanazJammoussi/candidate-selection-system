@@ -154,9 +154,11 @@ export default function AdminClassementPage() {
         </div>
         {concoursSelectionne && (
           <div className="flex gap-2">
-            <Button variant="outline">
-              <Download className="mr-2 h-4 w-4" />
-              Exporter
+            <Button variant="outline" asChild>
+              <a href={`/api/admin/export?concoursId=${selectedConcoursId}`} download>
+                <Download className="mr-2 h-4 w-4" />
+                Exporter
+              </a>
             </Button>
             <Button onClick={handleGenerateRanking} disabled={isGenerating}>
               {isGenerating ? (

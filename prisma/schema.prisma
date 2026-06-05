@@ -40,15 +40,26 @@ enum CandidatureStatut {
 // ============================================================
 
 model Candidat {
-  id        String   @id @default(cuid())
-  prenom    String
-  nom       String
-  cin       String   @unique
-  email     String   @unique
-  phone     String?
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String    @id @default(cuid())
+  prenom         String
+  nom            String
+  cin            String    @unique
+  email          String    @unique
+  phone          String?
+  password       String
+  isActive       Boolean   @default(true)
+  birthDate      String?
+  gouvernorat    String?
+  ville          String?
+  codePostal     String?
+  adresse        String?
+  diploma        String?
+  institution    String?
+  specialization String?
+  graduationYear String?
+  gpa            String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   candidatures Candidature[]
 }

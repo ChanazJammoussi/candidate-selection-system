@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,7 +8,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Camera, Save, User, GraduationCap, Mail, Phone, MapPin, Calendar } from "lucide-react"
+import { Camera, Save, User, GraduationCap, Mail, Phone, MapPin, Calendar, Loader2 } from "lucide-react"
+import { updateProfilAction } from "@/lib/actions/candidat"
 
 const TUNISIE_DATA: Record<string, { ville: string; codePostal: string }[]> = {
   "Tunis": [
@@ -331,12 +332,21 @@ function EmptyBadge({ value, editing }: { value: string; editing: boolean }) {
 export default function ProfilClient({ initialData }: { initialData: ProfilData }) {
   const [isEditing, setIsEditing] = useState(false)
   const [profileData, setProfileData] = useState<ProfilData>(initialData)
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
 
   const initials = `${profileData.firstName.charAt(0)}${profileData.lastName.charAt(0)}`.toUpperCase()
 
   const handleSave = () => {
-    setIsEditing(false)
-    // TODO étape suivante : appel Server Action pour persister les modifications
+    setError(null)
+    startTransition(async () => {
+      const result = await updateProfilAction(profileData)
+      if (result.success) {
+        setIsEditing(false)
+      } else {
+        setError(result.error)
+      }
+    })
   }
 
   return (
@@ -346,20 +356,23 @@ export default function ProfilClient({ initialData }: { initialData: ProfilData 
           <h2 className="text-2xl font-bold text-foreground">Mon Profil</h2>
           <p className="text-muted-foreground">Gérez vos informations personnelles et académiques</p>
         </div>
-        <div className="flex gap-2">
-          {isEditing ? (
-            <>
-              <Button variant="outline" onClick={() => setIsEditing(false)}>
-                Annuler
-              </Button>
-              <Button onClick={handleSave}>
-                <Save className="mr-2 h-4 w-4" />
-                Enregistrer
-              </Button>
-            </>
-          ) : (
-            <Button onClick={() => setIsEditing(true)}>Modifier le profil</Button>
-          )}
+        <div className="flex flex-col items-end gap-2">
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <div className="flex gap-2">
+            {isEditing ? (
+              <>
+                <Button variant="outline" onClick={() => { setIsEditing(false); setError(null) }} disabled={isPending}>
+                  Annuler
+                </Button>
+                <Button onClick={handleSave} disabled={isPending}>
+                  {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Enregistrer
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => setIsEditing(true)}>Modifier le profil</Button>
+            )}
+          </div>
         </div>
       </div>
 
